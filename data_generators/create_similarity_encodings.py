@@ -1,58 +1,59 @@
 from shapesorting import *
 
-from autoencoder_lib import AutoEncoder
+from autoencoding.autoencoder_lib import AutoEncoder
 from sandbox.util import Saver
 
 import argparse
 import tensorflow as tf
 import numpy as np
 
+#from dqn_master.restore import AGENT_PARAMS, AGENT_PARAMS_DICT
+
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--exp_name',type=str,default='shape_encoder')
-parser.add_argument('--data_name',type=str,default='similarity-00000')
-
 # encoding models
-parser.add_argument('--autoencoder_name',type=str,default='shape_encoder-00005-00001')
-parser.add_argument('--dqnencoder_name',type=str,default='shape_encoder_dqn-00000')
+parser.add_argument('--similarity_time',type=str,default='00-00-00')
+parser.add_argument('--autoencoder_time',type=str,default='00-00-00')
+parser.add_argument('--dqnencoder_time',type=str,default='16-11-05')
+
+# hyperparameters
+parser.add_argument('--batch_size',type=int,default=20)
 
 args = parser.parse_args()
 
-encoding_saver = Saver(args.encoding_name, path=DATADIR)
-similarity_saver = Saver(args.data_name,path= DATADIR,overwrite=True)
-autoencoder_saver = Saver(args.autoencoder_name,path=DATADIR,overwrite=True)
-dqnencoder_saver = Saver(args.dqnencoder_name,path=DATADIR,overwrite=True)
+# save to ...
+encoding_saver = Saver(path='{}/{}'.format(DATADIR,'enco_simi_data'))
+
+# load from ...
+similarity_saver = Saver(time=args.similarity_time,path='{}/{}'.format(DATADIR,'simi_data'))
+autoencoder_saver = Saver(time=args.autoencoder_time,path='{}/{}'.format(DATADIR,'aue_weights'))
+dqnencoder_saver = Saver(time=args.dqnencoder_time,path='{}/{}'.format(DATADIR,'dqn_weights'))
 
 X1 = similarity_saver.load_value(0, "X1")
 X2 = similarity_saver.load_value(0, "X2")
 Y = similarity_saver.load_value(0, "Y")
 N = X1.shape[0]
 
+X1 = np.repeat(
+    X1[...,None],repeats=4,axis=-1
+    )
+X2 = np.repeat(
+    X2[...,None],repeats=4,axis=-1
+    )
+
 autoencoder_weights = autoencoder_saver.load_dictionary(0,'encoder')
 dqnencoder_weights = dqnencoder_saver.load_dictionary(0,'encoder')
 
-#convert = {'l1_w':'l1_W:0',
-           #'l2_w':'l2_W:0',
-           #'l3_w':'l3_W:0',
-           #'l4_w':'l4_W:0',
-           #'q_w':'q_W:0',
-           #'l1_b':'l1_b:0',
-           #'l2_b':'l2_b:0',
-           #'l3_b':'l3_b:0',
-           #'l4_b':'l4_b:0',
-           #'q_b':'q_b:0',          
-           #}
-
-#convert2 = {v:k for k, v in convert.iteritems()}
-
-#ENCODER.set_weights([autoencoder_weights[convert2[w.name]] for w in ENCODER.weights])
-
-baseline_encoder = AutoEncoder(20)
-reinforc_encoder = AutoEncoder(20)
+with tf.variable_scope('baseline'):
+    baseline_encoder = AutoEncoder(20)
+with tf.variable_scope('reinforc'):
+    reinforc_encoder = AutoEncoder(20)
 
 with tf.Session() as sess:
     baseline_encoder.load_weights(autoencoder_weights)
     reinforc_encoder.load_weights(dqnencoder_weights)
+    #W = DQN_ENCODER.get_weights()
+    #reinforc_encoder.load_weights(AGENT_PARAMS_DICT)
 
     for layer in baseline_encoder.layers.keys():
         bZ1 = []
@@ -78,6 +79,6 @@ with tf.Session() as sess:
              'rZ1':np.concatenate(bZ1,axis=0),
              'rZ2':np.concatenate(bZ2,axis=0)}
         encoding_saver.save_dict(0, D, name="{}_encodings".format(layer))
+    encoding_saver.save_dict(0, {'Y':Y})
     
-
 halt= True

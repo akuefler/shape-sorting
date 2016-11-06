@@ -98,7 +98,8 @@ X1 = np.concatenate(X1,axis=0)
 X2 = np.concatenate(X2,axis=0)
 Y = np.array(Y)
 
-saver = Saver('similarity', path=DATADIR)
+saver = Saver(path="{}/{}".format(DATADIR,'simi_data'))
+
 saver.save_args(args)
 saver.save_dict(0,{'X1':X1,
                    'X2':X2,
