@@ -61,7 +61,7 @@ def _create_sequential_encoder(conv_hw,conv_s,conv_d, hspec,
     create a dummy model which we don't train so we can easily count output layer sizes
     of the convolutions. (Eases specification of the deconv net).
     """
-    model = ks.models.Sequential()
+    model = ks.models.Sequential(name=model_name)
     for i, (hw, stride, n_filters) in enumerate(zip(conv_hw,conv_s,conv_d)):
         if i == 0:
             model.add(KL.Conv2D(n_filters, hw, hw, subsample=(stride,stride),input_shape= (input_shape), name= layer_names.pop(0)))
@@ -145,6 +145,8 @@ class AutoEncoder(object):
             self.layers['l4'] = self.l4
             self.layers['q'] = self.q
             
+            self.layer_names = ['l1','l2','l3','l4','l5','q']
+            
             #DECODER
             output_shapes = [(20, 9, 9, 64), (20, 20, 20, 32), (20, 84, 84, 4)]
             
@@ -190,21 +192,20 @@ class AutoEncoder(object):
         return z
     
     def load_weights(self, weights):
-        convert = {'l1_w':'l1_W:0',
-                   'l2_w':'l2_W:0',
-                   'l3_w':'l3_W:0',
-                   'l4_w':'l4_W:0',
-                   'q_w':'q_W:0',
-                   'l1_b':'l1_b:0',
-                   'l2_b':'l2_b:0',
-                   'l3_b':'l3_b:0',
-                   'l4_b':'l4_b:0',
-                   'q_b':'q_b:0',          
-                   }
         ops = []
-        for k, v in weights.iteritems():
-            ops.append(
-                self.encoder_weights[k].assign(v)
+        if type(weights) == dict:
+            for k, v in weights.iteritems():
+                ops.append(
+                    self.encoder_weights[k].assign(v)
+                    )
+        else:
+            for i, w in enumerate(weights):
+                if i % 2 == 0:
+                    suffix = '_w'
+                else:
+                    suffix = '_b'
+                ops.append(
+                    self.encoder_weights[self.layer_names[i]+suffix].assign(w)
                 )
         sess = tf.get_default_session()
         sess.run(ops)
