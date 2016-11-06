@@ -1,5 +1,5 @@
 import gym
-from game_settings import SHAPESORT_ARGS1, SHAPESORT_ARGS2
+from game_settings import SHAPESORT_ARGS0, SHAPESORT_ARGS1, SHAPESORT_ARGS2
 from game import ShapeSorter
 
 class ShapeSorterWrapper(ShapeSorter):
@@ -14,7 +14,9 @@ class ShapeSorterWrapper(ShapeSorter):
             random_cursor=ShapeSorterWrapper.random_cursor,
             random_holes=ShapeSorterWrapper.random_holes,
             step_size=ShapeSorterWrapper.step_size,
-            rot_size=ShapeSorterWrapper.rot_size
+            rot_size=ShapeSorterWrapper.rot_size,
+            act_map=ShapeSorterWrapper.act_map,
+            reward_dict=ShapeSorterWrapper.reward_dict
         )
     
     @classmethod
