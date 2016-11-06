@@ -97,20 +97,6 @@ class Hexagon(PolyBlock):
         self.vertices= self.V = np.row_stack([np.dot(u,R(theta)) for theta in thetas])
         self.rotate(angle)
         
-class Star(PolyBlock):
-    def __init__(self, color, center, size, typ, angle = 0.0, **kwargs):
-        PolyBlock.__init__(self, color, center, size, typ, angle)
-        third = int(self.size/3)
-        sixth= int(self.size/6)
-        
-        u = np.ones((1,2))
-        thetas = [np.radians(theta) for theta in range(0,360,360/10)]
-        magnitudes = np.array([third, sixth] * 5)
-        R = lambda x : np.array([[np.cos(x),-np.sin(x)],
-                                 [np.sin(x),np.cos(x)]])
-        self.vertices= self.V = np.row_stack([np.dot(u,R(theta)) * magnitudes[i] for i, theta in enumerate(thetas)])
-        self.rotate(angle)
-        
 class RightTri(PolyBlock):
     def __init__(self, color, center, size, typ, angle = 0.0, **kwargs):
         PolyBlock.__init__(self, color, center, size, typ, angle)
@@ -130,4 +116,32 @@ class Trapezoid(PolyBlock):
                       [int(0.33 * size),int(0.66*size)]])
         v -= v.mean(axis=0)
         self.vertices = self.V = v
+        self.rotate(angle)
+        
+# more shapes ...
+
+class Star(PolyBlock):
+    def __init__(self, color, center, size, typ, angle = 0.0, **kwargs):
+        PolyBlock.__init__(self, color, center, size, typ, angle)
+        third = int(self.size/3)
+        sixth= int(self.size/6)
+        
+        u = np.ones((1,2))
+        thetas = [np.radians(theta) for theta in range(0,360,360/10)]
+        magnitudes = np.array([third, sixth] * 5)
+        R = lambda x : np.array([[np.cos(x),-np.sin(x)],
+                                 [np.sin(x),np.cos(x)]])
+        self.vertices= self.V = np.row_stack([np.dot(u,R(theta)) * magnitudes[i] for i, theta in enumerate(thetas)])
+        self.rotate(angle)
+        
+class Pentagon(PolyBlock):
+    def __init__(self, color, center, size, typ, angle = 0.0, **kwargs):
+        PolyBlock.__init__(self, color, center, size, typ, angle)
+        third= self.size/3
+        
+        u = np.ones((1,2)) * third
+        thetas = [np.radians(theta) for theta in range(0,360,360/5)]
+        R = lambda x : np.array([[np.cos(x),-np.sin(x)],
+                                 [np.sin(x),np.cos(x)]])
+        self.vertices= self.V = np.row_stack([np.dot(u,R(theta)) for theta in thetas])
         self.rotate(angle)
