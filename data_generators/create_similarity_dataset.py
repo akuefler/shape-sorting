@@ -12,7 +12,7 @@ import pygame
 from sandbox.util import Saver
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--vary_pos',type=bool,default=True)
+parser.add_argument('--vary_pos',type=bool,default=False)
 parser.add_argument('--vary_ang',type=bool,default=True)
 parser.add_argument('--vary_size',type=bool,default=True)
 
@@ -36,6 +36,16 @@ else:
 X1 = []
 X2 = []
 Y = []
+
+SHAPES1 = []
+SIZES1 = []
+ANGLES1 = []
+POSITS1 = []
+
+SHAPES2 = []
+SIZES2 = []
+ANGLES2 = []
+POSITS2 = []
 
 H = 200
 W = 200
@@ -70,13 +80,16 @@ for i in range(args.N):
         t = 60
         offset1 = np.array([np.random.randint(-t,t),np.random.randint(-t,t)])
         offset2 = np.array([np.random.randint(-t,t),np.random.randint(-t,t)])
+    else:
+        offset1 = 0.0
+        offset2 = 0.0
         
     if args.vary_size:
         size1 = np.random.randint(40,70)
         size2 = np.random.randint(40,70)
     
     # generate first image
-    block1 = shape1(RED, np.array([H,W])/2. + offset1, size1, 'block', angle=ang1)
+    block1 = shape1(BLACK, np.array([H,W])/2. + offset1, size1, 'block', angle=ang1)
     block1.render(screen)
     x1 = process_observation(screen)[None,...]
     X1.append(x1)
@@ -84,10 +97,20 @@ for i in range(args.N):
     screen.fill(WHITE)
     
     # generate second image
-    block2 = shape2(RED, np.array([H,W])/2. + offset2, size2, 'block', angle=ang2)
+    block2 = shape2(BLACK, np.array([H,W])/2. + offset2, size2, 'block', angle=ang2)
     block2.render(screen)
     x2 = process_observation(screen)[None,...]
     X2.append(x2)
+    
+    SHAPES1.append(shapes.index(shape1))
+    SIZES1.append(size1)
+    ANGLES1.append(ang1)
+    POSITS1.append(offset1)
+    
+    SHAPES2.append(shapes.index(shape2))
+    SIZES2.append(size2)
+    ANGLES2.append(ang2)
+    POSITS2.append(offset2)    
     
     if False:
         xband = np.column_stack((x1, np.zeros_like(x1), x2))
@@ -103,6 +126,14 @@ saver = Saver(path="{}/{}".format(DATADIR,'simi_data'))
 saver.save_args(args)
 saver.save_dict(0,{'X1':X1,
                    'X2':X2,
-                   'Y':Y})
+                   'Y':Y,
+                   'SHAPES1':SHAPES1,
+                   'SIZES1':SIZES1,
+                   'ANGLES1':ANGLES1,
+                   'POSITS1':POSITS1,
+                   'SHAPES2':SHAPES2,
+                   'SIZES2':SIZES2,
+                   'ANGLES2':ANGLES2,
+                   'POSITS2':POSITS2},name='data')
 
 args = parser.parse_args()
