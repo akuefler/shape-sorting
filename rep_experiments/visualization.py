@@ -10,50 +10,50 @@ import sklearn.metrics as mets
 
 from sklearn.decomposition import *
 from sklearn.lda import LDA
+from sklearn.manifold import TSNE
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--encoding_time',type=str,default='16-11-05')
+parser.add_argument('--encoding_time',type=str,default='16-11-06')
+parser.add_argument('--use_pca',type=bool,default=False)
+parser.add_argument('--use_tsne',type=bool,default=False)
 args = parser.parse_args()
 
 encoding_saver = Saver(time=args.encoding_time,path='{}/{}'.format(DATADIR,'enco_simi_data'))
 
-Y = encoding_saver.load_value(0,'Y')
-N = len(Y)
-D = encoding_saver.load_dictionary(0, 'l4_encodings')
+simi_data = encoding_saver.load_dictionary(0,'simi_data')
+D = encoding_saver.load_dictionary(0, 'l2_encodings')
 C = np.array([[1,0,0],
               [0,0,1]])
+K = simi_data['SHAPES1']
+Y = simi_data['Y']
+P = simi_data['POSITS1']
+
+N = len(Y)
 
 pca = PCA(n_components=2)
-#lda = LDA(n_components=2,solver='svd')
-#lda = sk.discriminant_analysis.LinearDiscriminantAnalysis(n_components=5)
+tsne = TSNE(n_components=2)
 
+def color_from_2D(X):
+    X = X.astype('float32')
+    X -= X.min()
+    X /= X.max()
+    return np.column_stack((X,np.zeros_like(X[:,0])[...,None]))
+
+f, (ax1, ax2) = plt.subplots(1,2)
+#K = color_from_2D(P)
 for merge in [lambda x, y : np.column_stack((x,y)), lambda x, y : x * y]:
-    
-    X = merge(D['bZ1'],D['bZ2'])
-    #lda.fit(X, Y)
-    #P = lda.means_
-    #Z = lda.transform(X)
-    #Z = np.dot(X,P.T)
-    Z = pca.fit_transform(X, y=Y)
-    if Z.shape[-1] == 1:
-        plt.scatter(Z[:,0],np.ones(N,), c= C[Y])
-        plt.show()
-    else:
-        plt.scatter(Z[:,0], Z[:,1], c=C[Y])
+    for model in [tsne]:
+        Z1, Z2 = D['rZ1'], D['rZ2']
+        if Z1.ndim != 2:
+            Z1 = np.reshape(Z1,(N,-1))
+            Z2 = np.reshape(Z2,(N,-1))
+        RAND_Z = np.random.normal(size=Z1.shape)
+        
+        D1 = tsne.fit_transform(Z1)
+        D2 = tsne.fit_transform(Z1)
+        RAND_D = tsne.fit_transform(RAND_Z)
+        
+        ax1.scatter(D1[:,0], D1[:,1], c=K)
+        ax2.scatter(RAND_D[:,0], RAND_D[:,1], c=K)
         plt.show()
         
-    halt= True
-    
-    
-    
-    #N = X.shape[0]
-    #p = np.random.permutation(N)
-    
-    #X = X[p]
-    #Y = Y[p]
-    #cutoff = int(0.7 * N)
-    
-    #X_t = X[:cutoff]
-    #Y_t = Y[:cutoff]
-    #X_v = X[cutoff:]
-    #Y_v = Y[cutoff:]

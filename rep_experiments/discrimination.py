@@ -12,20 +12,20 @@ import sklearn.naive_bayes
 import sklearn.tree
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--encoding_time',type=str,default='16-11-05')
+parser.add_argument('--encoding_time',type=str,default='16-11-06')
 args = parser.parse_args()
 
 encoding_saver = Saver(time=args.encoding_time,path='{}/{}'.format(DATADIR,'enco_simi_data'))
 
 Y = encoding_saver.load_value(0,'Y')
-D = encoding_saver.load_dictionary(0, 'l4_encodings')
+D = encoding_saver.load_dictionary(0, 'adv_hid_encodings')
 
 models = [sk.linear_model.LogisticRegression(), sk.svm.SVC(), sklearn.lda.LDA(),
           sklearn.naive_bayes.GaussianNB(), sklearn.tree.DecisionTreeClassifier()]
 
 for merge in [lambda x, y : np.column_stack((x,y)), lambda x, y : x * y]:
     
-    X = merge(D['bZ1'],D['bZ2'])
+    X = merge(D['rZ1'],D['rZ2'])
     N = X.shape[0]
     p = np.random.permutation(N)
     
