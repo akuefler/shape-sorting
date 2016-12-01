@@ -8,7 +8,6 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--exp_name',type=str,default='shape_encoder')
 parser.add_argument('--data_name',type=str,default='random_rollout_shapes-00004')
 
-parser.add_argument('--normalize',type=bool,default=True)
 parser.add_argument('--share_weights',type=bool,default=True)
 parser.add_argument('--n_channels',type=int,default=4)
 
@@ -17,7 +16,6 @@ parser.add_argument('--train',type=bool,default=False)
 # training
 parser.add_argument('--epochs',type=int,default=100)
 parser.add_argument('--batch_size',type=int,default=20)
-parser.add_argument('--cmx',type=float,default=1.0) # regularization weight for complexity loss
 
 args = parser.parse_args()
 

@@ -21,7 +21,7 @@ env = ShapeSorter(**SHAPESORT_ARGS[1])
 
 input_shape= (84,84,4)  # TENSORFLOW INPUT SHAPE
 
-activation_fn = tf.nn.elu
+activation_fn = tf.nn.relu
 
 #bias = K.variable(np.zeros((output_shape[-1],)))
 #model.add(KL.Lambda(lambda x : x + bias, output_shape= output_shape[1:]))
@@ -56,7 +56,7 @@ class Model():
         return X_hat, LOGITS
 
 class AutoEncoder(Model):
-    def __init__(self, batch_size, dueling= True, supervised=False, top_layer='l3_flat'):
+    def __init__(self, batch_size, dueling= True, supervised=False, trainable=False, top_layer='l3_flat'):
         
         self.batch_size = batch_size
         
@@ -89,32 +89,33 @@ class AutoEncoder(Model):
             self.classifier(z)
         else:
             self.decoder(layer=top_layer)
-        
             
-    def classifier(self, x, n_units = 256):
-        self.class_hid1, self.classifier_weights['class_hid1_w'], self.classifier_weights['class_hid1_b'] = \
-            linear(x, n_units, activation_fn=activation_fn, name='class_hid1')
-        self.class_hid2, self.classifier_weights['class_hid2_w'], self.classifier_weights['class_hid2_b'] = \
-            linear(self.class_hid1, n_units, activation_fn=activation_fn, name='class_hid2')
-        self.class_hid3, self.classifier_weights['class_hid3_w'], self.classifier_weights['class_hid3_b'] = \
-                    linear(self.class_hid2, n_units, activation_fn=activation_fn, name='class_hid3')        
-        #self.logits, self.classifier_weights['output_w'], self.classifier_weights['output_b'] = \
-            #linear(self.class_hid3, 1, name='logits')
+        var_list = self.classifier_weights.values()
+        if trainable:
+            var_list += self.encoder_weights.values()
+            
+        self.opt = tf.train.AdamOptimizer().minimize(self.cost, var_list= var_list)
+        
+        
+    def classifier(self, x, n_layers= 1, n_units = 128):
+        
+        #self.class_hid1, self.classifier_weights['class_hid1_w'], self.classifier_weights['class_hid1_b'] = \
+            #linear(x, n_units, activation_fn=activation_fn, name='class_hid1')
+        #self.class_hid2, self.classifier_weights['class_hid2_w'], self.classifier_weights['class_hid2_b'] = \
+            #linear(self.class_hid1, n_units, activation_fn=activation_fn, name='class_hid2')
+        h = x
+        for i in range(n_layers):
+            h, self.classifier_weights['class_hid1_w'], self.classifier_weights['class_hid1_b'] = \
+                linear(h, n_units, activation_fn=activation_fn, name='class_hid{}'.format(i))            
+
         self.logits, self.classifier_weights['output_w'], self.classifier_weights['output_b'] = \
-            linear(self.class_hid3, 2, name='logits')            
+            linear(h, 2, name='logits')            
         
         self.x_hat = tf.argmax(self.logits,1)
         self.cost = tf.reduce_mean(
-            tf.nn.sparse_softmax_cross_entropy_with_logits(tf.squeeze(self.logits), self.y)
+            tf.nn.sparse_softmax_cross_entropy_with_logits(self.logits, self.y)
         )
-        
-        self.opt = tf.train.AdamOptimizer().minimize(self.cost)        
-            
-        #self.x_hat = tf.nn.sigmoid(self.logits) > 0.5
-        
-        #self.cost = tf.reduce_mean(
-            #tf.nn.sigmoid_cross_entropy_with_logits(tf.squeeze(self.logits), self.y)
-            #)        
+               
         
     def encoder(self, x, top_layer = 'l3_flat'):
         initializer = tf.contrib.layers.xavier_initializer_conv2d()
@@ -281,9 +282,6 @@ class SplitNet(Model):
         self.xp = xp = tf.placeholder(tf.float32, shape=(self.batch_size,84,84,4), name='xp_input')
         
         self.y = y = tf.placeholder(tf.int32, shape=(self.batch_size,), name='y_input')
-        #x1, x2 = tf.split(1, 2, x, name="x_split")
-        #x1 = tf.squeeze(x1,squeeze_dims=[1],name='x1')
-        #x2 = tf.squeeze(x2,squeeze_dims=[1],name='x2')
         
         with tf.variable_scope('encoding') as scope:
             z1 = self.encoder(x)
@@ -293,28 +291,36 @@ class SplitNet(Model):
         z = tf.concat(1,[z1,z2],name='z')
         self.logits = logits = self.classifier(z)
         self.x_hat = tf.argmax(self.logits,1)
+        #self.x_hat = tf.to_int32(self.logits > 0)
         
-        self.cost = tf.nn.sparse_softmax_cross_entropy_with_logits(logits, y)
+        self.cost = tf.reduce_mean(
+            tf.nn.sparse_softmax_cross_entropy_with_logits(logits, y)
+        )
+        #self.cost = tf.reduce_mean(
+            #tf.nn.sigmoid_cross_entropy_with_logits(tf.squeeze(logits),y)
+        #)
         self.opt = tf.train.AdamOptimizer().minimize(self.cost)
         
         #self.l1_flat = tf.reshape(self.l1, [-1, reduce(lambda x, y: x * y, self.l1.get_shape().as_list()[1:])])
         
         
     def encoder(self,x):
-        conv_w1 = tf.get_variable('conv_w1', shape=(3,3,4,20), dtype=tf.float32, 
+        chans = [10,10,5]
+        conv_w1 = tf.get_variable('conv_w1', shape=(3,3,4,chans[0]), dtype=tf.float32, 
                                  initializer=tf.contrib.layers.xavier_initializer())
-        conv_b1 = tf.get_variable('conv_b1', shape=(20,), dtype=tf.float32)
-        conv_w2 = tf.get_variable('conv_w2', shape=(5,5,20,10), dtype=tf.float32, 
+        conv_b1 = tf.get_variable('conv_b1', shape=(chans[0],), dtype=tf.float32)
+        conv_w2 = tf.get_variable('conv_w2', shape=(5,5,chans[0],chans[1]), dtype=tf.float32, 
                                  initializer=tf.contrib.layers.xavier_initializer())
-        conv_b2 = tf.get_variable('conv_b2', shape=(10,), dtype=tf.float32)
-        conv_w3 = tf.get_variable('conv_w3', shape=(5,5,10,5), dtype=tf.float32, 
+        conv_b2 = tf.get_variable('conv_b2', shape=(chans[1],), dtype=tf.float32)
+        conv_w3 = tf.get_variable('conv_w3', shape=(5,5,chans[1],chans[2]), dtype=tf.float32, 
                                  initializer=tf.contrib.layers.xavier_initializer())
-        conv_b3 = tf.get_variable('conv_b3', shape=(5,), dtype=tf.float32)        
+        conv_b3 = tf.get_variable('conv_b3', shape=(chans[2],), dtype=tf.float32)        
         
         h1 = activation_fn(tf.nn.conv2d(x, conv_w1, [1,1,1,1], "VALID") + conv_b1)
         h2 = activation_fn(tf.nn.conv2d(h1, conv_w2, [1,2,2,1], "VALID") + conv_b2)
         h3 = activation_fn(tf.nn.conv2d(h2, conv_w3, [1,2,2,1], "VALID") + conv_b3)
-        h4 = tf.nn.max_pool(h3, [1,2,2,1], [1,2,2,1], "VALID")
+        h4 = h3
+        #h4 = tf.nn.max_pool(h3, [1,2,2,1], [1,2,2,1], "VALID")
         h = tf.reshape(h4, [-1, reduce(lambda x, y: x * y, h4.get_shape().as_list()[1:])])
         
         self.merge_dim = h.get_shape()[-1].value
@@ -325,15 +331,19 @@ class SplitNet(Model):
         return h
         
     def classifier(self,z):
-        w1 = tf.get_variable('w1',shape=(2 * self.merge_dim,256))
-        b1 = tf.get_variable('b1',shape=(256,))
-        w2 = tf.get_variable('w2',shape=(256,128))
-        b2 = tf.get_variable('b2',shape=(128,))
-        w_out = tf.get_variable('w_out',shape=(128,2))
+        w1 = tf.get_variable('w1',shape=(2 * self.merge_dim,512))
+        b1 = tf.get_variable('b1',shape=(512,))
+        w2 = tf.get_variable('w2',shape=(512,256))
+        b2 = tf.get_variable('b2',shape=(256,))
+        #w3 = tf.get_variable('w3',shape=(256,256))
+        #b3 = tf.get_variable('b3',shape=(256,))
+        
+        w_out = tf.get_variable('w_out',shape=(256,2))
         b_out = tf.get_variable('b_out',shape=(2,))
         
         h1 = activation_fn(tf.nn.xw_plus_b(z, w1, b1, name='fc1'))
         h2 = activation_fn(tf.nn.xw_plus_b(h1, w2, b2, name='fc2'))
+        #h3 = activation_fn(tf.nn.xw_plus_b(h2, w3, b3, name='fc2'))
         logits = tf.nn.xw_plus_b(h2, w_out, b_out, name='logits')
         
         self.decoder_weights = {'w1':w1,'w2':w2,'w_out':w_out,
@@ -348,18 +358,31 @@ def train(model, X_t, Y_t, X_v, Y_v, epochs=1000, saver= None):
     N_v = X_v.shape[0]
     
     for epoch in range(epochs):
-        p = np.random.permutation(N_t)
-        X_t = X_t[p]
-        Y_t = Y_t[p]
         
         losses_t = []
         losses_v = []
-        for i in range(0,N_t,model.batch_size):
+        minibatches = range(0,N_t,model.batch_size)
+        random.shuffle(minibatches)
+        
+        for i in minibatches:
             X_t_batch = X_t[i:model.batch_size+i]
             Y_t_batch = Y_t[i:model.batch_size+i]
             
             if model.supervised:
-                X1_t_batch, X2_t_batch = np.split(X_t_batch,2,axis=1) 
+                X1_t_batch, X2_t_batch = np.split(X_t_batch,2,axis=1)
+                
+                #import matplotlib.pyplot as plt
+                #i = 0
+                #while True:
+                    #f, (ax1) = plt.subplots(1)
+                    #A = X1_t_batch[i,0,:,:,1].astype('float32')
+                    #B = X2_t_batch[i,0,:,:,1].astype('float32')
+                    #ax1.imshow(np.column_stack((A,B)))
+                    #plt.show()
+                    #print Y_t_batch[i]
+                    
+                    #i += 1                  
+                    
                 feed_t = {model.x: np.squeeze(X1_t_batch),
                           model.xp: np.squeeze(X2_t_batch),
                           model.y: Y_t_batch}
@@ -368,6 +391,7 @@ def train(model, X_t, Y_t, X_v, Y_v, epochs=1000, saver= None):
                 
             loss, _ = sess.run([model.cost,model.opt],feed_t)
             losses_t.append(loss)
+            
         for i in range(0,N_v,model.batch_size):
             X_v_batch = X_v[i:model.batch_size+i]
             Y_v_batch = Y_v[i:model.batch_size+i]
