@@ -38,13 +38,16 @@ def fit(hole, block):
             
     return pos_fit and geom_fit
 
-def process_observation(screen):
+def process_observation(screen,HW,rHW):
 
     r = pg.surfarray.pixels_red(screen).astype('float32')
     g = pg.surfarray.pixels_green(screen).astype('float32')
     b = pg.surfarray.pixels_blue(screen).astype('float32')
     X = (2 ** 2) * r + 2 * g + b # convert to 1D map
-    Z = imresize(X,(84,84))
+    if HW != rHW:
+        Z = imresize(X,(rHW,rHW))
+    else:
+        Z = X
     Y = (Z.astype('float32') - 255/2) / (255/2)
     
     return Y
@@ -95,11 +98,17 @@ class ShapeSorter(object):
                  act_map = DISCRETE_ACT_MAP,
                  reward_dict = REWARD_DICT,
                  step_size = 20,
-                 rot_size = 30
+                 rot_size = 30,
+                 screen_HW = 200,
+                 screen_rHW = 84,
+                 cursor_size = 10
                  ):
         assert len(sizes) == len(shapes)
         pg.init()
-        self.H = 200; self.W = 200
+        #self.H = 200; self.W = 200
+        self.H, self.W = screen_HW, screen_HW
+        self.rHW = screen_rHW
+        self.cursor_size = cursor_size
         
         self.act_map = act_map
         self.reward_dict = reward_dict
@@ -131,7 +140,7 @@ class ShapeSorter(object):
             raise NotImplementedError
         
         #self.observation_space = Box(0, 1, 84 * 84)
-        self.observation_space = Box(-float('inf'),float('inf'),(84,84))
+        self.observation_space = Box(-float('inf'),float('inf'),(self.rHW,self.rHW))
             
         block_selections= np.random.multinomial(self.n_blocks, [1./len(self.shapes)]*len(self.shapes))
         hDisp = [None]*len(self.shapes)
@@ -296,13 +305,13 @@ class ShapeSorter(object):
             col= BLUE
         else:
             col= GREEN 
-        pg.draw.circle(self.screen, col, self.state['cursorPos'], 10)
+        pg.draw.circle(self.screen, col, self.state['cursorPos'], self.cursor_size)
         
         if self.state['bList'] == []:
             done= True
             reward+= REWARD_DICT['trial_end'] / self.n_blocks
         
-        observation = process_observation(self.screen)
+        observation = process_observation(self.screen,self.H,self.rHW)
         
         return observation, reward, done, info
     
@@ -377,6 +386,8 @@ def main(smooth= False, **kwargs):
                 actions.append('none')
                 
             _,reward,done,info = ss.step(actions)
+            #plt.imshow(_)
+            #plt.show()
             ss.render()
             
             if done:

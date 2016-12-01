@@ -100,42 +100,57 @@ SHAPESORT_ARGS1 = dict(
 SHAPESORT_ARGS2 = dict(
         act_mode='discrete',
         grab_mode='toggle',
-        shapes=[Trapezoid, RightTri, Hexagon, Tri, Rect] * 2,
-        sizes=[60,60,60,60,60] + [40,40,40,40,40],
+        shapes=[Trapezoid, RightTri, Hexagon, Tri, Rect],
+        sizes=[20,20,20,20,20],
         n_blocks=3,
         random_cursor=True,
         random_holes=True,
-        step_size=20,
-        rot_size=30
-    )
-
-SHAPESORT_ARGS3 = dict(
-        act_mode='discrete',
-        grab_mode='toggle',
-        shapes=[Hexagon, Tri, Rect],
-        sizes=[60,60,60],
-        n_blocks=3,
-        random_cursor=True,
-        random_holes=True,
-        step_size=20,
+        step_size=8,
         rot_size=30,
-        act_map= DISCRETE_ACT_MAP4,
-        reward_dict= REWARD_DICT3
+        screen_HW=80,
+        screen_rHW=42,
+        cursor_size=5
     )
 
-SHAPESORT_ARGS4 = dict(
-        act_mode='discrete',
-        grab_mode='toggle',
-        shapes=[Hexagon, Tri, Rect],
-        sizes=[60,60,60],
-        n_blocks=4,
-        random_cursor=False,
-        random_holes=True,
-        step_size=25,
-        rot_size=45,
-        shrink_hw=32,
-        act_map= DISCRETE_ACT_MAP4,
-        reward_dict= REWARD_DICT2
-    )
+#SHAPESORT_ARGS2 = dict(
+        #act_mode='discrete',
+        #grab_mode='toggle',
+        #shapes=[Trapezoid, RightTri, Hexagon, Tri, Rect] * 2,
+        #sizes=[60,60,60,60,60] + [40,40,40,40,40],
+        #n_blocks=3,
+        #random_cursor=True,
+        #random_holes=True,
+        #step_size=20,
+        #rot_size=30
+    #)
 
-SHAPESORT_ARGS = [SHAPESORT_ARGS0, SHAPESORT_ARGS1, SHAPESORT_ARGS2, SHAPESORT_ARGS3, SHAPESORT_ARGS4]
+#SHAPESORT_ARGS3 = dict(
+        #act_mode='discrete',
+        #grab_mode='toggle',
+        #shapes=[Hexagon, Tri, Rect],
+        #sizes=[60,60,60],
+        #n_blocks=3,
+        #random_cursor=True,
+        #random_holes=True,
+        #step_size=20,
+        #rot_size=30,
+        #act_map= DISCRETE_ACT_MAP4,
+        #reward_dict= REWARD_DICT3
+    #)
+
+#SHAPESORT_ARGS4 = dict(
+        #act_mode='discrete',
+        #grab_mode='toggle',
+        #shapes=[Hexagon, Tri, Rect],
+        #sizes=[60,60,60],
+        #n_blocks=4,
+        #random_cursor=False,
+        #random_holes=True,
+        #step_size=25,
+        #rot_size=45,
+        #shrink_hw=32,
+        #act_map= DISCRETE_ACT_MAP4,
+        #reward_dict= REWARD_DICT2
+    #)
+
+SHAPESORT_ARGS = [SHAPESORT_ARGS0, SHAPESORT_ARGS1, SHAPESORT_ARGS2]
