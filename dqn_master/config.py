@@ -15,7 +15,7 @@ class AgentConfig(object):
   discount = 0.95
   target_q_update_step = 1 * scale
   learning_rate = 0.00025
-  learning_rate_minimum = 0.00025
+  learning_rate_minimum = 0.000025
   learning_rate_decay = 0.96
   learning_rate_decay_step = 5 * scale
 
@@ -23,8 +23,8 @@ class AgentConfig(object):
   ep_start = 1.
   ep_end_t = memory_size
 
-  #history_length = 1
   history_length = 1
+  #history_length = 4
   
   train_frequency = 4
   learn_start = 5. * scale
@@ -46,8 +46,8 @@ class AgentConfig(object):
 class EnvironmentConfig(object):
   env_name = 'Breakout-v0'
 
-  screen_width  = 84
-  screen_height = 84
+  screen_width  = 42
+  screen_height = 42
   max_reward = 1000.
   min_reward = -1000.
   
