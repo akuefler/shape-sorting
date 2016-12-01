@@ -18,10 +18,12 @@ np.random.seed(456)
 parser = argparse.ArgumentParser()
 #parser.add_argument('--encoding_time',type=str,default='16-11-06-nopos')
 #parser.add_argument('--encoding_time',type=str,default='16-11-06_w_pos')
-parser.add_argument('--encoding_times',type=str,default=['16-11-11-08-31PM'])
+parser.add_argument('--encoding_times',type=str,default=['16-11-11-07-18PM'])
+#parser.add_argument('--encoding_times',type=str,default=['16-11-11-08-31PM']) # position is NOT varied.
 
 parser.add_argument('--use_pca',type=bool,default=False)
 parser.add_argument('--use_tsne',type=bool,default=False)
+parser.add_argument('--N',type=int,default=None)
 args = parser.parse_args()
 
 Z = []
@@ -31,8 +33,14 @@ for et in args.encoding_times:
     #encodings = encoding_saver.load_dictionary(0, 'adv_hid_encodings')
     encodings = encoding_saver.load_dictionary(0, 'l3_flat_encodings')
     encodings = encoding_saver.load_dictionary(0, 'adv_hid_encodings')
-    
-    p = np.random.choice(encodings['rZ1'].shape[0],100,replace=False)
+    encodings = encoding_saver.load_dictionary(0, 'value_hid_encodings')
+    if args.N is not None:
+        try:
+            p = np.random.choice(encodings['rZ1'].shape[0],args.N,replace=False)
+        except ValueError:
+            p = np.arange(0,encodings['rZ1'].shape[0]) 
+    else:
+        p = np.arange(0,encodings['rZ1'].shape[0])
     Z.append(encodings['rZ1'][p])
 
 C = np.array([[1,0,0],
@@ -98,7 +106,9 @@ markers = ["D","H","s","o","^","2","3","4","8"]
 #for merge in [lambda x, y : np.column_stack((x,y)), lambda x, y : x * y]:
     #for model in [tsne]:
     
-title_color = [("pos.",C1),("size",C2),("ang.",C3),("shape",C4)]
+#title_color = [("pos.",C1),("size",C2),("ang.",C3),("shape",C4)]
+title_color = [("pos.",C1),("shape",C4)]
+
 title_color = filter(lambda x : not np.isnan(x[1].sum()),title_color)
 f, axs = plt.subplots(len(title_color),1)
 if axs.ndim == 1:
@@ -125,6 +135,13 @@ for i in range(len(Z)):
     
 for axrow, (title,color) in zip(axs, title_color):
     for i, ax in enumerate(axrow):
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])        
+        #ax.set_xlabel(None)
+        #ax.set_ylabel(None)
+        
         if False:
             for k in np.unique(K):
                 ixs = K == k
@@ -135,7 +152,7 @@ for axrow, (title,color) in zip(axs, title_color):
                 
                 ax.hold(True)
         else:
-            ax.set_title(title)
+            #ax.set_title(title)
             ax.scatter(D[i][:,0],D[i][:,1],c=color)
             ax.hold(True)
 

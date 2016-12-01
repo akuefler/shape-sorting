@@ -22,6 +22,7 @@ parser.add_argument('--encoding_time',type=str,default='16-11-11-07-18PM')
 
 parser.add_argument('--classification',type=bool,default=False)
 parser.add_argument('--similarity',type=bool,default=False)
+parser.add_argument('--encoding',type=str)
 args = parser.parse_args()
 
 encoding_saver = Saver(time=args.encoding_time,path='{}/{}'.format(DATADIR,'enco_simi_data'))
@@ -32,13 +33,18 @@ X1 = simi_data['X1']
 SHAPES1 = simi_data['SHAPES1']
 
 #Y = encoding_saver.load_value(0,'Y')
-D = encoding_saver.load_dictionary(0, 'l3_flat_encodings') # more overfitting, more validation accuracy
-D = encoding_saver.load_dictionary(0, 'l2_flat_encodings') 
+#D = encoding_saver.load_dictionary(0, 'l3_flat_encodings') # more overfitting, more validation accuracy
+#D = encoding_saver.load_dictionary(0, 'l2_flat_encodings') 
 #D = encoding_saver.load_dictionary(0, 'adv_hid_encodings')
+D = encoding_saver.load_dictionary(0, args.encoding)
+
+print("#####################")
+print("ENCODING IS: {}".format(args.encoding))
 
 if args.classification:
-    models = [sk.linear_model.LogisticRegression(), sk.svm.SVC(), sklearn.lda.LDA(),
-              sklearn.naive_bayes.GaussianNB(), sklearn.tree.DecisionTreeClassifier()]
+    models = [sk.linear_model.LogisticRegression(), sk.svm.SVC(), sklearn.lda.LDA()]
+    #models = [sk.linear_model.LogisticRegression(), sk.svm.SVC(), sklearn.lda.LDA(),
+              #sklearn.naive_bayes.GaussianNB(), sklearn.tree.DecisionTreeClassifier()]
     
     X = D['rZ1']
     N = X.shape[0]
