@@ -24,7 +24,7 @@ flags.DEFINE_string('env_type', 'shapesort', 'environment type?')
 flags.DEFINE_string('game_settings', 1, 'game settings')
 flags.DEFINE_integer('action_repeat', 1, 'The number of action to be repeated')
 
-flags.DEFINE_string('folder_name', 'november28_smallfilt_dueling_settings1', 'The name of the folder to save to.')
+flags.DEFINE_string('folder_name', 'november30_dueling_settings1', 'The name of the folder to save to.')
 #flags.DEFINE_string('folder_name', 'july17', 'The name of the folder to save to.')
 
 #flags.DEFINE_string('folder_name', 'breakout_test', 'The name of the folder to save to.')
