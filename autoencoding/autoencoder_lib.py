@@ -9,6 +9,7 @@ import keras.layers as KL
 from dqn_master.dqn.ops import linear, conv2d
 
 import random
+import matplotlib.pyplot as plt
 
 from game_settings import DISCRETE_ACT_MAP4
 from rllab.sampler.utils import rollout
@@ -25,6 +26,73 @@ activation_fn = tf.nn.relu
 
 #bias = K.variable(np.zeros((output_shape[-1],)))
 #model.add(KL.Lambda(lambda x : x + bias, output_shape= output_shape[1:]))
+
+def _encoder(x, dueling):
+    initializer = tf.contrib.layers.xavier_initializer_conv2d()
+    layers = {}
+    encoder_weights = {}
+    decoder_weights = {}
+
+    l1, encoder_weights['l1_w'], encoder_weights['l1_b'] = conv2d(x, 32, [8, 8], [4, 4], initializer, activation_fn, 'NHWC', name='l1')
+    l2, encoder_weights['l2_w'], encoder_weights['l2_b'] = conv2d(l1, 64, [4, 4], [2, 2], initializer, activation_fn, 'NHWC', name='l2')
+    l3, encoder_weights['l3_w'], encoder_weights['l3_b'] = conv2d(l2, 64, [3, 3], [1, 1], initializer, activation_fn, 'NHWC', name='l3')
+
+    l1_flat = tf.reshape(l1, [-1, reduce(lambda x, y: x * y, l1.get_shape().as_list()[1:])])
+    l2_flat = tf.reshape(l2, [-1, reduce(lambda x, y: x * y, l2.get_shape().as_list()[1:])])
+    l3_flat = tf.reshape(l3, [-1, reduce(lambda x, y: x * y, l3.get_shape().as_list()[1:])])
+
+    layers['l1_flat'] = l1_flat
+    layers['l2_flat'] = l2_flat
+    layers['l3_flat'] = l3_flat
+
+    if dueling:
+        value_hid, encoder_weights['l4_val_w'], encoder_weights['l4_val_b'] = \
+            linear(l3_flat, 512, activation_fn=activation_fn, name='value_hid')
+
+        adv_hid, encoder_weights['l4_adv_w'], encoder_weights['l4_adv_b'] = \
+            linear(l3_flat, 512, activation_fn=activation_fn, name='adv_hid')
+
+        value, encoder_weights['val_w_out'], encoder_weights['val_w_b'] = \
+            linear(value_hid, 1, name='value_out')
+
+        advantage, encoder_weights['adv_w_out'], encoder_weights['adv_w_b'] = \
+            linear(adv_hid, 7, name='adv_out')
+
+        layers['value_hid'] = value_hid
+        layers['adv_hid'] = adv_hid
+        layers['value'] = value
+        layers['advtantage'] = advantage
+
+        # Average Dueling
+        q = value + (advantage - 
+                               tf.reduce_mean(advantage, reduction_indices=1, keep_dims=True))
+
+        decoder_weights['l4_w_t'] = l4_w_t = tf.transpose(encoder_weights['l4_adv_w']) 
+        decoder_weights['q_w_t'] = q_w_t = tf.transpose(encoder_weights['adv_w_out'])
+
+        l4_w = encoder_weights['l4_adv_w']
+        q_w = encoder_weights['adv_w_out']
+
+    else:
+        l4, encoder_weights['l4_w'], encoder_weights['l4_b'] = \
+            linear(l3_flat, 512, activation_fn=activation_fn, name='l4')
+        q, encoder_weights['q_w'], encoder_weights['q_b'] = \
+            linear(l4, 7, name='q')            
+
+        layers['l4'] = l4
+
+        decoder_weights['l4_w_t'] = l4_w_t = tf.transpose(encoder_weights['l4_w'])                
+        decoder_weights['q_w_t'] = q_w_t = tf.transpose(encoder_weights['q_w'])
+
+        l4_w = encoder_weights['l4_w']
+        q_w = encoder_weights['q_w']
+
+    layers['l1'] = l1
+    layers['l2'] = l2
+    layers['l3'] = l3
+    layers['q'] = q
+    
+    return layers, encoder_weights
 
 class Model():
     def predict(self, X):
@@ -54,6 +122,143 @@ class Model():
 
         X_hat, LOGITS = sess.run([self.x_hat,self.logits],feed)
         return X_hat, LOGITS
+    
+    def load_weights(self, weights):
+        ops = []
+        if type(weights) == dict:
+            for k, v in weights.iteritems():
+                ops.append(
+                    self.encoder_weights[k].assign(v)
+                    )
+        else:
+            for i, w in enumerate(weights):
+                if i % 2 == 0:
+                    suffix = '_w'
+                else:
+                    suffix = '_b'
+                ops.append(
+                    self.encoder_weights[self.layer_names[i]+suffix].assign(w)
+                )
+        sess = tf.get_default_session()
+        sess.run(ops)    
+    
+class Simonyan(Model):
+    def __init__(self,n_class,v_class,dueling= True,top_layer='adv_hid_layer',batch_size=20,reg=0.1):
+        self.batch_size = batch_size
+        self.layers = {}
+        self.encoder_weights = {}
+        self.encoder_weights = {}
+        self.dueling = dueling
+        
+        self.n_class = n_class
+        
+        self.x = x = tf.placeholder(tf.float32, shape=(None,84,84,4))
+        self.y = tf.placeholder(tf.int32, shape=(None,))
+        
+        self.I = tf.get_variable("I", shape=(1,84,84,4), dtype=tf.float32)
+        
+        with tf.variable_scope("encoder") as scope:
+            z = self.encoder(x, top_layer=top_layer)
+            scope.reuse_variables()
+            z_v = self.encoder(self.I, top_layer=top_layer)
+            
+        with tf.variable_scope("classifier") as scope:
+            self.x_hat, self.logits, cls_params = self.classifier(z)
+            scope.reuse_variables()
+            self.x_hat_v, self.logits_v, _ = self.classifier(z_v)
+            
+        self.cls_cost = tf.reduce_mean(
+            tf.nn.sparse_softmax_cross_entropy_with_logits(self.logits, self.y)
+        )
+        self.vis_cost = -self.logits_v[:,v_class] + reg * tf.nn.l2_loss(self.I)
+        self.optimizer = tf.train.AdamOptimizer()
+        
+        self.cls_opt = self.optimizer.minimize(self.cls_cost,var_list=cls_params)
+        self.vis_opt = self.optimizer.minimize(self.vis_cost,var_list=[self.I])
+            
+    def encoder(self, x, top_layer = 'l3_flat'):
+        layers, weights = _encoder(x, self.dueling)
+        self.layers.update(layers)
+        self.encoder_weights.update(weights)
+        return self.layers[top_layer]
+    
+    def classifier(self, x):
+        dim = x.get_shape()[-1].value
+        w = tf.get_variable("w",shape=(dim,self.n_class),dtype=tf.float32)
+        b = tf.get_variable("b",shape=(self.n_class),dtype=tf.float32)
+        
+        logits = tf.nn.xw_plus_b(x, w, b)
+        x_hat = tf.argmax(logits,1)
+        
+        return x_hat, logits, [w,b]
+    
+    def visprop(self, epochs=100):
+        sess = tf.get_default_session()
+        #X = np.random.randn(*map(lambda a : a.value, x.get_shape()[1:]))
+        for epoch in range(epochs):
+            #loss = sess.run(self.vis_cost)
+            #_ = sess.run(self.vis_opt)
+            loss, _ = sess.run([self.vis_cost, self.vis_opt])
+            print("epoch {} of {} -- loss: {}".format(epoch,epochs,loss))
+            
+        I = self.I.eval(sess)
+        
+        halt= True
+        
+    def _predict(self, X):
+        sess = tf.get_default_session()
+        feed = {self.x: X}
+        X_hat, LOGITS = sess.run([self.x_hat,self.logits],feed)
+        return X_hat, LOGITS    
+            
+    def train(self, X_t, Y_t, X_v, Y_v, epochs=1000, saver= None):
+        sess = tf.get_default_session()
+        N_t = X_t.shape[0]
+        N_v = X_v.shape[0]
+        
+        w_orig = self.I.eval(sess)
+        
+        for epoch in range(epochs):
+            
+            losses_t = []
+            losses_v = []
+            minibatches = range(0,N_t,self.batch_size)
+            random.shuffle(minibatches)
+            
+            for i in minibatches:
+                X_t_batch = X_t[i:self.batch_size+i]
+                Y_t_batch = Y_t[i:self.batch_size+i]
+                
+                feed_t = {self.x: X_t_batch, self.y : Y_t_batch}
+                    
+                loss, _ = sess.run([self.cls_cost,self.cls_opt],feed_t)
+                losses_t.append(loss)
+                
+            for i in range(0,N_v,self.batch_size):
+                X_v_batch = X_v[i:self.batch_size+i]
+                Y_v_batch = Y_v[i:self.batch_size+i]
+                
+                feed_v = {self.x: X_v_batch, self.y : Y_t_batch}
+                    
+                loss = sess.run(self.cls_cost,feed_v)
+                losses_v.append(loss) 
+                
+            loss_t = np.mean(losses_t)
+            loss_v = np.mean(losses_v)
+            
+            w = self.I.eval(session=sess)
+            assert np.allclose(w,w_orig)
+            
+            print 'Epoch: {}/{}, Training loss: {}, validation loss: {}'.format(epoch,epochs,loss_t,loss_v)
+            
+            if saver is not None:
+                #saver.save_models(epoch, [self])
+                saver.save_dict(epoch, {'loss_t': loss_t, 'loss_v': loss_v})
+                encoder_d = {key:tensor.eval(session=sess) for key, tensor in self.encoder_weights.iteritems()}
+                decoder_d = {key:tensor.eval(session=sess) for key, tensor in self.decoder_weights.iteritems()}
+                saver.save_dict(epoch, decoder_d, name= 'decoder')
+                saver.save_dict(epoch, encoder_d, name= 'encoder')    
+        
 
 class AutoEncoder(Model):
     def __init__(self, batch_size, dueling= True, supervised=False, trainable=False, top_layer='l3_flat'):
@@ -97,7 +302,7 @@ class AutoEncoder(Model):
         self.opt = tf.train.AdamOptimizer().minimize(self.cost, var_list= var_list)
         
         
-    def classifier(self, x, n_layers= 1, n_units = 128):
+    def classifier(self, x, n_layers= 1, n_units = 1024):
         
         #self.class_hid1, self.classifier_weights['class_hid1_w'], self.classifier_weights['class_hid1_b'] = \
             #linear(x, n_units, activation_fn=activation_fn, name='class_hid1')
@@ -105,83 +310,23 @@ class AutoEncoder(Model):
             #linear(self.class_hid1, n_units, activation_fn=activation_fn, name='class_hid2')
         h = x
         for i in range(n_layers):
-            h, self.classifier_weights['class_hid1_w'], self.classifier_weights['class_hid1_b'] = \
-                linear(h, n_units, activation_fn=activation_fn, name='class_hid{}'.format(i))            
+            h, self.classifier_weights['class_hid{}_w'.format(i)], self.classifier_weights['class_hid{}_b'.format(i)] = \
+                linear(h, n_units, activation_fn=activation_fn, name='class_hid{}'.format(i))
 
         self.logits, self.classifier_weights['output_w'], self.classifier_weights['output_b'] = \
-            linear(h, 2, name='logits')            
+            linear(h, 2, name='logits')
+        
+        reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)   
         
         self.x_hat = tf.argmax(self.logits,1)
         self.cost = tf.reduce_mean(
             tf.nn.sparse_softmax_cross_entropy_with_logits(self.logits, self.y)
-        )
+        ) + tf.reduce_mean(reg_losses)
                
         
     def encoder(self, x, top_layer = 'l3_flat'):
-        initializer = tf.contrib.layers.xavier_initializer_conv2d()
-        
-        self.l1, self.encoder_weights['l1_w'], self.encoder_weights['l1_b'] = conv2d(x,
-                                                             32, [8, 8], [4, 4], initializer, activation_fn, 'NHWC', name='l1')
-        self.l2, self.encoder_weights['l2_w'], self.encoder_weights['l2_b'] = conv2d(self.l1,
-                                                         64, [4, 4], [2, 2], initializer, activation_fn, 'NHWC', name='l2')
-        self.l3, self.encoder_weights['l3_w'], self.encoder_weights['l3_b'] = conv2d(self.l2,
-                                                         64, [3, 3], [1, 1], initializer, activation_fn, 'NHWC', name='l3')
-    
-        self.l1_flat = tf.reshape(self.l1, [-1, reduce(lambda x, y: x * y, self.l1.get_shape().as_list()[1:])])
-        self.l2_flat = tf.reshape(self.l2, [-1, reduce(lambda x, y: x * y, self.l2.get_shape().as_list()[1:])])
-        self.l3_flat = tf.reshape(self.l3, [-1, reduce(lambda x, y: x * y, self.l3.get_shape().as_list()[1:])])
-        
-        self.layers['l1_flat'] = self.l1_flat
-        self.layers['l2_flat'] = self.l2_flat
-        self.layers['l3_flat'] = self.l3_flat
-        
-        if self.dueling:
-            self.value_hid, self.encoder_weights['l4_val_w'], self.encoder_weights['l4_val_b'] = \
-                linear(self.l3_flat, 512, activation_fn=activation_fn, name='value_hid')
-        
-            self.adv_hid, self.encoder_weights['l4_adv_w'], self.encoder_weights['l4_adv_b'] = \
-                linear(self.l3_flat, 512, activation_fn=activation_fn, name='adv_hid')
-        
-            self.value, self.encoder_weights['val_w_out'], self.encoder_weights['val_w_b'] = \
-                linear(self.value_hid, 1, name='value_out')
-        
-            self.advantage, self.encoder_weights['adv_w_out'], self.encoder_weights['adv_w_b'] = \
-                linear(self.adv_hid, 7, name='adv_out')
-            
-            self.layers['value_hid'] = self.value_hid
-            self.layers['adv_hid'] = self.adv_hid
-            self.layers['value'] = self.value
-            self.layers['advtantage'] = self.advantage
-        
-            # Average Dueling
-            self.q = self.value + (self.advantage - 
-                                   tf.reduce_mean(self.advantage, reduction_indices=1, keep_dims=True))
-            
-            self.decoder_weights['l4_w_t'] = l4_w_t = tf.transpose(self.encoder_weights['l4_adv_w']) 
-            self.decoder_weights['q_w_t'] = q_w_t = tf.transpose(self.encoder_weights['adv_w_out'])
-            
-            l4_w = self.encoder_weights['l4_adv_w']
-            q_w = self.encoder_weights['adv_w_out']
-            
-        else:
-            self.l4, self.encoder_weights['l4_w'], self.encoder_weights['l4_b'] = \
-                linear(self.l3_flat, 512, activation_fn=activation_fn, name='l4')
-            self.q, self.encoder_weights['q_w'], self.encoder_weights['q_b'] = \
-                linear(self.l4, 7, name='q')            
-            
-            self.layers['l4'] = self.l4
-            
-            self.decoder_weights['l4_w_t'] = l4_w_t = tf.transpose(self.encoder_weights['l4_w'])                
-            self.decoder_weights['q_w_t'] = q_w_t = tf.transpose(self.encoder_weights['q_w'])
-            
-            l4_w = self.encoder_weights['l4_w']
-            q_w = self.encoder_weights['q_w']
-        
-        self.layers['l1'] = self.l1
-        self.layers['l2'] = self.l2
-        self.layers['l3'] = self.l3
-        self.layers['q'] = self.q
-        
+        layers = _encoder(x)
+        self.layers.update(layers)
         return self.layers[top_layer]
             
     def decoder(self, layer):
@@ -254,24 +399,24 @@ class AutoEncoder(Model):
         z = sess.run(self.layers[layer],{self.x:X})
         return z
     
-    def load_weights(self, weights):
-        ops = []
-        if type(weights) == dict:
-            for k, v in weights.iteritems():
-                ops.append(
-                    self.encoder_weights[k].assign(v)
-                    )
-        else:
-            for i, w in enumerate(weights):
-                if i % 2 == 0:
-                    suffix = '_w'
-                else:
-                    suffix = '_b'
-                ops.append(
-                    self.encoder_weights[self.layer_names[i]+suffix].assign(w)
-                )
-        sess = tf.get_default_session()
-        sess.run(ops)
+    #def load_weights(self, weights):
+        #ops = []
+        #if type(weights) == dict:
+            #for k, v in weights.iteritems():
+                #ops.append(
+                    #self.encoder_weights[k].assign(v)
+                    #)
+        #else:
+            #for i, w in enumerate(weights):
+                #if i % 2 == 0:
+                    #suffix = '_w'
+                #else:
+                    #suffix = '_b'
+                #ops.append(
+                    #self.encoder_weights[self.layer_names[i]+suffix].assign(w)
+                #)
+        #sess = tf.get_default_session()
+        #sess.run(ops)
     
 class SplitNet(Model):
     def __init__(self, batch_size):
@@ -357,6 +502,8 @@ def train(model, X_t, Y_t, X_v, Y_v, epochs=1000, saver= None):
     N_t = X_t.shape[0]
     N_v = X_v.shape[0]
     
+    w_orig = model.encoder_weights['l3_w'].eval(session=sess)
+    
     for epoch in range(epochs):
         
         losses_t = []
@@ -409,6 +556,9 @@ def train(model, X_t, Y_t, X_v, Y_v, epochs=1000, saver= None):
             
         loss_t = np.mean(losses_t)
         loss_v = np.mean(losses_v)
+        
+        w = model.encoder_weights['l3_w'].eval(session=sess)
+        assert np.allclose(w,w_orig)
         
         print 'Epoch: {}/{}, Training loss: {}, validation loss: {}'.format(epoch,epochs,loss_t,loss_v)
         
