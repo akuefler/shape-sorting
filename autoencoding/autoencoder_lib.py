@@ -64,8 +64,7 @@ def _encoder(x, dueling):
         layers['advtantage'] = advantage
 
         # Average Dueling
-        q = value + (advantage - 
-                               tf.reduce_mean(advantage, reduction_indices=1, keep_dims=True))
+        q = value + (advantage - tf.reduce_mean(advantage, reduction_indices=1, keep_dims=True))
 
         decoder_weights['l4_w_t'] = l4_w_t = tf.transpose(encoder_weights['l4_adv_w']) 
         decoder_weights['q_w_t'] = q_w_t = tf.transpose(encoder_weights['adv_w_out'])
@@ -123,6 +122,11 @@ class Model():
         X_hat, LOGITS = sess.run([self.x_hat,self.logits],feed)
         return X_hat, LOGITS
     
+    def encode(self, X, layer= 'l4'):
+        sess = tf.get_default_session()
+        z = sess.run(self.layers[layer],{self.x:X})
+        return z
+
     def load_weights(self, weights):
         ops = []
         if type(weights) == dict:
@@ -143,7 +147,7 @@ class Model():
         sess.run(ops)    
     
 class Simonyan(Model):
-    def __init__(self,n_class,v_class,dueling= True,top_layer='adv_hid_layer',batch_size=20,reg=0.1):
+    def __init__(self,n_class,v_class,dueling= True,top_layer='adv_hid',batch_size=20,reg=0.1):
         self.batch_size = batch_size
         self.layers = {}
         self.encoder_weights = {}
@@ -160,13 +164,14 @@ class Simonyan(Model):
         with tf.variable_scope("encoder") as scope:
             z = self.encoder(x, top_layer=top_layer)
             scope.reuse_variables()
-            z_v = self.encoder(self.I, top_layer=top_layer)
+            z_v = self.encoder(self.I, top_layer=top_layer, reusing= True)
             
         with tf.variable_scope("classifier") as scope:
             self.x_hat, self.logits, cls_params = self.classifier(z)
             scope.reuse_variables()
             self.x_hat_v, self.logits_v, _ = self.classifier(z_v)
             
+        self.cls_w, self.cls_b = cls_params
         self.cls_cost = tf.reduce_mean(
             tf.nn.sparse_softmax_cross_entropy_with_logits(self.logits, self.y)
         )
@@ -176,10 +181,11 @@ class Simonyan(Model):
         self.cls_opt = self.optimizer.minimize(self.cls_cost,var_list=cls_params)
         self.vis_opt = self.optimizer.minimize(self.vis_cost,var_list=[self.I])
             
-    def encoder(self, x, top_layer = 'l3_flat'):
+    def encoder(self, x, top_layer = 'l3_flat', reusing= False):
         layers, weights = _encoder(x, self.dueling)
-        self.layers.update(layers)
-        self.encoder_weights.update(weights)
+        if not reusing:
+            self.layers.update(layers)
+            self.encoder_weights.update(weights)
         return self.layers[top_layer]
     
     def classifier(self, x):
@@ -192,7 +198,7 @@ class Simonyan(Model):
         
         return x_hat, logits, [w,b]
     
-    def visprop(self, epochs=100):
+    def visprop(self, epochs=500):
         sess = tf.get_default_session()
         #X = np.random.randn(*map(lambda a : a.value, x.get_shape()[1:]))
         for epoch in range(epochs):
@@ -202,8 +208,7 @@ class Simonyan(Model):
             print("epoch {} of {} -- loss: {}".format(epoch,epochs,loss))
             
         I = self.I.eval(sess)
-        
-        halt= True
+        return I
         
     def _predict(self, X):
         sess = tf.get_default_session()
@@ -216,7 +221,8 @@ class Simonyan(Model):
         N_t = X_t.shape[0]
         N_v = X_v.shape[0]
         
-        w_orig = self.I.eval(sess)
+        #w_orig = self.I.eval(sess)
+        w_orig = self.encoder_weights.values()[0].eval(sess)
         
         for epoch in range(epochs):
             
@@ -246,7 +252,7 @@ class Simonyan(Model):
             loss_t = np.mean(losses_t)
             loss_v = np.mean(losses_v)
             
-            w = self.I.eval(session=sess)
+            w = self.encoder_weights.values()[0].eval(session=sess)
             assert np.allclose(w,w_orig)
             
             print 'Epoch: {}/{}, Training loss: {}, validation loss: {}'.format(epoch,epochs,loss_t,loss_v)
@@ -292,15 +298,20 @@ class AutoEncoder(Model):
         
         if supervised:
             self.classifier(z)
+            reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)               
+            self.cost = tf.reduce_mean(
+                tf.nn.sparse_softmax_cross_entropy_with_logits(self.logits, self.y)
+            ) + tf.reduce_mean(reg_losses)
+            
+            if trainable:
+                var_list += self.encoder_weights.values()
+            self.opt = tf.train.AdamOptimizer().minimize(self.cost, var_list= var_list)            
+
         else:
             self.decoder(layer=top_layer)
             
         var_list = self.classifier_weights.values()
-        if trainable:
-            var_list += self.encoder_weights.values()
-            
-        self.opt = tf.train.AdamOptimizer().minimize(self.cost, var_list= var_list)
-        
+                        
         
     def classifier(self, x, n_layers= 1, n_units = 1024):
         
@@ -315,18 +326,14 @@ class AutoEncoder(Model):
 
         self.logits, self.classifier_weights['output_w'], self.classifier_weights['output_b'] = \
             linear(h, 2, name='logits')
-        
-        reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)   
-        
+                
         self.x_hat = tf.argmax(self.logits,1)
-        self.cost = tf.reduce_mean(
-            tf.nn.sparse_softmax_cross_entropy_with_logits(self.logits, self.y)
-        ) + tf.reduce_mean(reg_losses)
                
         
     def encoder(self, x, top_layer = 'l3_flat'):
-        layers = _encoder(x)
+        layers, weights = _encoder(x, dueling= self.dueling)
         self.layers.update(layers)
+        self.encoder_weights.update(weights)
         return self.layers[top_layer]
             
     def decoder(self, layer):
@@ -394,10 +401,10 @@ class AutoEncoder(Model):
         #X_hat, LOGITS = sess.run([self.x_hat,self.logits],feed)
         #return X_hat, LOGITS
     
-    def encode(self, X, layer= 'l4'):
-        sess = tf.get_default_session()
-        z = sess.run(self.layers[layer],{self.x:X})
-        return z
+    #def encode(self, X, layer= 'l4'):
+        #sess = tf.get_default_session()
+        #z = sess.run(self.layers[layer],{self.x:X})
+        #return z
     
     #def load_weights(self, weights):
         #ops = []
