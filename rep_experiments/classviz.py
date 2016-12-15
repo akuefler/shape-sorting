@@ -11,6 +11,8 @@ from sandbox.util import Saver
 from sklearn.metrics import accuracy_score
 
 import matplotlib.pyplot as plt
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC, LinearSVC
 
 parser = argparse.ArgumentParser()
 
@@ -48,15 +50,15 @@ D = encoding_saver.load_dictionary(0, 'l3_flat_encodings') # more overfitting, m
 
 simi_data = encoding_saver.load_dictionary(0,'simi_data')
 Y = simi_data['Y']
-X = simi_data['X1']
-SHAPES = simi_data['SHAPES1']
+X = np.concatenate([simi_data['X1'],simi_data['X2']],axis=0)
+SHAPES = np.concatenate([simi_data['SHAPES1'],simi_data['SHAPES2']])
 
 N = X.shape[0]
 cutoff = int(0.7 * N)
 
 p = np.random.permutation(range(N))
-#X = X[p]
-#SHAPES = SHAPES[p]
+X = X[p]
+SHAPES = SHAPES[p]
 X = np.repeat(X[...,None], 4, axis=-1)
 
 X_t = X[:cutoff]
@@ -64,7 +66,11 @@ Y_t = SHAPES[:cutoff]
 X_v = X[cutoff:]
 Y_v = SHAPES[cutoff:]
 
-model = Simonyan(5,0, top_layer='adv_hid', dueling=True)
+A = np.random.normal(X_t.mean(axis=0), X_t.std(axis=0))
+
+# [Trapezoid, RightTri, Hexagon, Tri, Rect]
+def initializer(shape, dtype=None, partition_info=None):
+    return np.random.normal(X_t.mean(axis=0), X_t.std(axis=0))[None,...]
 
 # no weights: 46, 37
 
@@ -75,33 +81,43 @@ dqnencoder_weights = dqnencoder_saver.load_dictionary(0,'encoder')
 
 #np.random.seed(456)
 
+#f, axs = plt.subplots(5,4)
+#for i in range(5):
+    #for j in range(4):
+        #axs[i,j].imshow(X_t[Y_t==i].mean(axis=0)[:,:,j])
+        #axs[i,j].imshow(X_t[Y_t==i].mean(axis=0)[:,:,j])
+        
+halt= True
+
+model = Simonyan(5,top_layer='adv_hid', dueling=True, reg=0.01, I_initializer= initializer)
 with tf.Session() as sess:
     sess.run(tf.initialize_all_variables())
     model.load_weights(dqnencoder_weights)
     #model.train(X_t, Y_t, X_v, Y_v, epochs=200)
     
-    #import h5py
-    #with h5py.File('softmax_weights.h5','r') as hf:
-        #w = hf['w'][...]
-        #b = hf['b'][...]
+    import h5py
+    with h5py.File('svm_weights.h5','r') as hf:
+        w = hf['w'][...]
+        b = hf['b'][...]
         
     Z_t = model.encode(X_t, layer='adv_hid')
     Z_v = model.encode(X_v, layer='adv_hid')
     
-    from sklearn.linear_model import LogisticRegression
-    sk_model = LogisticRegression(solver='sag',multi_class='multinomial')
-    sk_model.fit(Z_t, Y_t)
+    #sk_model = LogisticRegression(solver='sag',multi_class='multinomial')
+    #sk_model = SVC(kernel='linear')
+    sk_model = LinearSVC(dual=False, C=0.1)
+    #sk_model.fit(Z_t, Y_t)
     
-    ops = [model.cls_w.assign(sk_model.coef_.T),model.cls_b.assign(sk_model.intercept_)]
+    #ops = [model.cls_w.assign(sk_model.coef_.T),model.cls_b.assign(sk_model.intercept_)]
+    ops = [model.cls_w.assign(w),model.cls_b.assign(b)]    
     sess.run(ops)
 
-    skp_t = sk_model.predict(Z_t)
-    skp_v = sk_model.predict(Z_v)
+    #skp_t = sk_model.predict(Z_t)
+    #skp_v = sk_model.predict(Z_v)
     
-    
-    print "Logistic: "
-    print "Train Acc: {}".format(accuracy_score(Y_t, skp_t))
-    print "Valid Acc: {}".format(accuracy_score(Y_v, skp_v))    
+    #print "Logistic: "
+    #print "Train Acc: {}".format(accuracy_score(Y_t, skp_t))
+    #print "Valid Acc: {}".format(accuracy_score(Y_v, skp_v))    
     
     p_t, l_t = model.predict(X_t)
     p_v, l_v = model.predict(X_v)
@@ -110,11 +126,37 @@ with tf.Session() as sess:
     print "Train Acc: {}".format(accuracy_score(Y_t, p_t))
     print "Valid Acc: {}".format(accuracy_score(Y_v, p_v))
     
-    ## load weights, 50 epochs
-    # 35.67 train, 32.43 valid
-    ## load weights, 100 epochs
-    # 38.17 train, 32.22 valid
+    Is = []
+    for i in range(5):
+        #I = model.visprop(cls_ix=i,epochs=1)
+        I = model.visprop(cls_ix=i,epochs=10000)
+        
+        p_i, l_i = model.predict(I)
+        print "Predicted for I: {}".format(p_i)
+        Is.append(I)
+
+f, axs = plt.subplots(5,4)
+plt.tight_layout()
+axs
+for i, axrow in enumerate(axs):
+    I = Is[i]
+    for j, ax in enumerate(axrow):
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        img = I[0,:,:,j]
+        ax.imshow(img,cmap="Greys")
+        
+plt.tight_layout()
+        
+#for i in range(4):
+    #img = I[0,:,:,i]
+    ##img = (img - img.min())/(img.max() - img.min())
+    #axs[0,i].imshow(img,cmap="jet")   
+    ##axs[1,i].imshow(I[0,:,:,i] + X_t.mean(axis=0)[:,:,i])
+    #axs[1,i].imshow(np.concatenate([I[0,:,:,i],X_t[Y_t==i].mean(axis=0)[:,:,i]],axis=1),cmap="jet")
     
-    I = model.visprop()    
+plt.show()
 
 halt= True
