@@ -16,12 +16,13 @@ import sklearn.tree
 import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser()
-#parser.add_argument('--encoding_time',type=str,default='16-11-11-07-17PM')
-parser.add_argument('--encoding_time',type=str,default='16-11-11-07-18PM')
-#parser.add_argument('--encoding_time',type=str,default='16-11-11-08-31PM')
+#parser.add_argument('--encoding_time',type=str,default='16-11-11-07-18PM')
+#parser.add_argument('--encoding_time',type=str,default='16-12-03-09-40PM')
+parser.add_argument('--encoding_time',type=str,default='16-12-03-10-35PM')
 
 parser.add_argument('--classification',type=bool,default=False)
 parser.add_argument('--similarity',type=bool,default=False)
+parser.add_argument('--class_vis',type=bool,default=False)
 parser.add_argument('--encoding',type=str)
 args = parser.parse_args()
 
@@ -42,17 +43,17 @@ print("#####################")
 print("ENCODING IS: {}".format(args.encoding))
 
 if args.classification:
-    models = [sk.linear_model.LogisticRegression(), sk.svm.SVC(), sklearn.lda.LDA()]
+    #models = [sk.linear_model.LogisticRegression(), sk.svm.SVC(), sklearn.lda.LDA()]
+    models = [sk.linear_model.LogisticRegression(multi_class='multinomial',solver='sag'),
+              sk.linear_model.LogisticRegression(multi_class='ovr')]
+    
     #models = [sk.linear_model.LogisticRegression(), sk.svm.SVC(), sklearn.lda.LDA(),
               #sklearn.naive_bayes.GaussianNB(), sklearn.tree.DecisionTreeClassifier()]
     
     X = D['rZ1']
     N = X.shape[0]
     cutoff = int(0.7 * N)
-
-    O_t = X1[:cutoff]
-    O_v = X1[cutoff:]
-
+    
     X_t = X[:cutoff]
     Y_t = SHAPES1[:cutoff]
     X_v = X[cutoff:]
