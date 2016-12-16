@@ -10,6 +10,7 @@ import scipy.stats as stats
 import matplotlib.pyplot as plt
 
 import itertools
+from collections import Counter
 
 parser = argparse.ArgumentParser()
 #parser.add_argument('--encoding_time',type=str,default='16-11-11-07-17PM')
@@ -18,7 +19,9 @@ parser.add_argument('--encoding_time',type=str,default='16-11-11-07-18PM')
 
 parser.add_argument('--classification',type=bool,default=False)
 parser.add_argument('--similarity',type=bool,default=False)
-parser.add_argument('--encoding',type=str,default="adv_hid_encodings")
+parser.add_argument('--encodings',type=str,nargs="+",
+                    default=["l1_flat_encodings","l2_flat_encodings","l3_flat_encodings",
+                             "adv_hid_encodings","value_hid_encodings"])
 
 parser.add_argument('--categories',type=str,default='shape')
 
@@ -36,16 +39,6 @@ ANGLES1 = simi_data['ANGLES1']
 #D = encoding_saver.load_dictionary(0, 'l3_flat_encodings') # more overfitting, more validation accuracy
 #D = encoding_saver.load_dictionary(0, 'l2_flat_encodings') 
 #D = encoding_saver.load_dictionary(0, 'adv_hid_encodings')
-D = encoding_saver.load_dictionary(0, args.encoding)
-
-X = D['rZ1']
-Xshapes = []
-for s in np.unique(SHAPES1):
-    Xshapes.append(
-        X[SHAPES1 == s]
-    )
-    
-sts = []
 
 class LayerProfile(object):
     def __init__(self):
@@ -70,35 +63,64 @@ class NeuronProfile(object):
     @property
     def num_responsive(self):
         return len(self.responsive_pairs)
-
-layer_profile = LayerProfile()
-neuron_profiles = []
-for neuron in xrange(X.shape[1]):
-    print "{} of {}".format(neuron,X.shape[1])
-    neuron_profile = NeuronProfile()
     
-    sts.append(
-        stats.f_oneway(*[x[:,neuron] for x in Xshapes])
+    @property
+    def preferred_shape(self):
+        mc = Counter(itertools.chain.from_iterable(self.responsive_pairs)).most_common()
+        if mc == []:
+            return []
+        else:
+            mx = mc[0][-1]
+            return [m[0] for m in mc if m[1] == mx]
+   
+layer_profiles = {} 
+for encoding in args.encodings:
+    D = encoding_saver.load_dictionary(0, encoding)
+    X = D['rZ1']
+    Xshapes = []
+    for s in np.unique(SHAPES1):
+        Xshapes.append(
+            X[SHAPES1 == s]
         )
-    pvals = [st.pvalue for st in sts]
-    significant = [pval < 0.05 for pval in pvals]
-    
-    pairs = [pair for pair in itertools.combinations(np.unique(SHAPES1), 2) if pair[0] != pair[1]]
-    #for sig in significant:
-        #if sig:
-    ttest_pvals = []
-    ttest_significant = []
-    for pair in pairs:
-        ttest_result = stats.ttest_ind(Xshapes[pair[0]][:,neuron],Xshapes[pair[1]][:,neuron])
-        ttest_pval = ttest_result.pvalue
         
-        ttest_pvals.append(ttest_pval)
-        if ttest_pval < 0.05:
-            neuron_profile.pval = ttest_pval
-            neuron_profile.responsive_pairs.add(pair)
-                        
-    neuron_profiles.append(neuron_profile)
+    sts = []
     
-layer_profile.neuron_profiles = neuron_profiles
+    layer_profile = LayerProfile()
+    neuron_profiles = []
+    for neuron in xrange(X.shape[1]):
+        print "{} of {}".format(neuron,X.shape[1])
+        neuron_profile = NeuronProfile()
+        
+        sts.append(
+            stats.f_oneway(*[x[:,neuron] for x in Xshapes])
+            )
+        pvals = [st.pvalue for st in sts]
+        significant = [pval < 0.05 for pval in pvals]
+        
+        pairs = [pair for pair in itertools.combinations(np.unique(SHAPES1), 2) if pair[0] != pair[1]]
+        #for sig in significant:
+            #if sig:
+        ttest_pvals = []
+        ttest_significant = []
+        for pair in pairs:
+            ttest_result = stats.ttest_ind(Xshapes[pair[0]][:,neuron],Xshapes[pair[1]][:,neuron])
+            ttest_pval = ttest_result.pvalue
+            
+            ttest_pvals.append(ttest_pval)
+            if ttest_pval < 0.05 / len(pairs): # Bonferonni correction
+                neuron_profile.pval = ttest_pval
+                neuron_profile.responsive_pairs.add(pair)
+                            
+        neuron_profiles.append(neuron_profile)
+    layer_profile.neuron_profiles = neuron_profiles
+    layer_profiles[encoding] = layer_profile
+    
+#for i, npp in enumerate(layer_profile.neuron_profiles):
+    #print "i: {}".format(i)
+    #print npp.preferred_shape
+    ##print npp.num_responsive
+    
+for k, v in layer_profiles.iteritems():
+    print "{} : {}".format(k,v.average_responsiveness)
          
 halt= True
