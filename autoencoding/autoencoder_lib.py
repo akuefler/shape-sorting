@@ -108,7 +108,7 @@ class Model():
             logit = np.concatenate(logits)
                 
         else:
-            raise NotImplementedError
+            pred, logit = self._predict(X)
         return pred, logit
             
     def _predict(self, X):
@@ -147,7 +147,8 @@ class Model():
         sess.run(ops)    
     
 class Simonyan(Model):
-    def __init__(self,n_class,v_class,dueling= True,top_layer='adv_hid',batch_size=20,reg=0.1):
+    def __init__(self,n_class,dueling= True,top_layer='adv_hid',batch_size=20,reg=0.1,
+                 I_initializer = tf.zeros_initializer):
         self.batch_size = batch_size
         self.layers = {}
         self.encoder_weights = {}
@@ -158,8 +159,10 @@ class Simonyan(Model):
         
         self.x = x = tf.placeholder(tf.float32, shape=(None,84,84,4))
         self.y = tf.placeholder(tf.int32, shape=(None,))
+        self.cls_ix = tf.placeholder(tf.int32,shape=())
         
-        self.I = tf.get_variable("I", shape=(1,84,84,4), dtype=tf.float32)
+        self.I = tf.get_variable("I", shape=(1,84,84,4), dtype=tf.float32,
+                                 initializer=I_initializer)
         
         with tf.variable_scope("encoder") as scope:
             z = self.encoder(x, top_layer=top_layer)
@@ -175,7 +178,7 @@ class Simonyan(Model):
         self.cls_cost = tf.reduce_mean(
             tf.nn.sparse_softmax_cross_entropy_with_logits(self.logits, self.y)
         )
-        self.vis_cost = -self.logits_v[:,v_class] + reg * tf.nn.l2_loss(self.I)
+        self.vis_cost = -self.logits_v[:,self.cls_ix] + reg * tf.nn.l2_loss(self.I)
         self.optimizer = tf.train.AdamOptimizer()
         
         self.cls_opt = self.optimizer.minimize(self.cls_cost,var_list=cls_params)
@@ -186,7 +189,7 @@ class Simonyan(Model):
         if not reusing:
             self.layers.update(layers)
             self.encoder_weights.update(weights)
-        return self.layers[top_layer]
+        return layers[top_layer]
     
     def classifier(self, x):
         dim = x.get_shape()[-1].value
@@ -198,13 +201,14 @@ class Simonyan(Model):
         
         return x_hat, logits, [w,b]
     
-    def visprop(self, epochs=500):
+    def visprop(self, cls_ix, epochs=500):
         sess = tf.get_default_session()
         #X = np.random.randn(*map(lambda a : a.value, x.get_shape()[1:]))
+        init_I = self.I.eval(sess)
         for epoch in range(epochs):
             #loss = sess.run(self.vis_cost)
             #_ = sess.run(self.vis_opt)
-            loss, _ = sess.run([self.vis_cost, self.vis_opt])
+            loss, _ = sess.run([self.vis_cost, self.vis_opt],{self.cls_ix:cls_ix})
             print("epoch {} of {} -- loss: {}".format(epoch,epochs,loss))
             
         I = self.I.eval(sess)
