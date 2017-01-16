@@ -12,9 +12,10 @@ from .replay_memory import ReplayMemory
 from utils import get_time, save_pkl, load_pkl
 
 class Agent(BaseModel):
-  def __init__(self, config, environment, sess):
+  def __init__(self, config, environment, sess, load_weights= True):
     super(Agent, self).__init__(config)
     self.sess = sess
+    self.load_weights = load_weights
     self.weight_dir = 'weights'
 
     self.env = environment
@@ -176,7 +177,7 @@ class Agent(BaseModel):
     return updated_dqn, updated_target
 
   def q_learning_mini_batch(self):
-    if self.memory.count < self.history_length:
+    if self.memory.count <= self.history_length:
       return
     else:
       s_t, action, reward, s_t_plus_1, terminal = self.memory.sample()
@@ -229,22 +230,30 @@ class Agent(BaseModel):
         self.s_t = tf.placeholder('float32',
             [None, self.history_length, self.screen_width, self.screen_height], name='s_t')
 
+      #output_dims = [16,32,32]
+      output_dims = [32,64,64]
+      hw = [[8,8],[4,4],[3,3]]
+      strides = [[4,4],[2,2],[1,1]]
+      hidsize = [512]
+
+      #self.l1, self.w['l1_w'], self.w['l1_b'] = conv2d(self.s_t,
+          #32, [8, 8], [4, 4], initializer, activation_fn, self.cnn_format, name='l1')
       self.l1, self.w['l1_w'], self.w['l1_b'] = conv2d(self.s_t,
-          32, [8, 8], [4, 4], initializer, activation_fn, self.cnn_format, name='l1')
+          output_dims[0], hw[0], strides[0], initializer, activation_fn, self.cnn_format, name='l1')
       self.l2, self.w['l2_w'], self.w['l2_b'] = conv2d(self.l1,
-          64, [4, 4], [2, 2], initializer, activation_fn, self.cnn_format, name='l2')
+          output_dims[1], hw[1], strides[1], initializer, activation_fn, self.cnn_format, name='l2')
       self.l3, self.w['l3_w'], self.w['l3_b'] = conv2d(self.l2,
-          64, [3, 3], [1, 1], initializer, activation_fn, self.cnn_format, name='l3')
+          output_dims[2], hw[2], strides[2], initializer, activation_fn, self.cnn_format, name='l3')
 
       shape = self.l3.get_shape().as_list()
       self.l3_flat = tf.reshape(self.l3, [-1, reduce(lambda x, y: x * y, shape[1:])])
 
       if self.dueling:
+        hs = hidsize[0]
         self.value_hid, self.w['l4_val_w'], self.w['l4_val_b'] = \
-            linear(self.l3_flat, 512, activation_fn=activation_fn, name='value_hid')
-
+          linear(self.l3_flat, hs, activation_fn=activation_fn, name='value_hid')
         self.adv_hid, self.w['l4_adv_w'], self.w['l4_adv_b'] = \
-            linear(self.l3_flat, 512, activation_fn=activation_fn, name='adv_hid')
+          linear(self.l3_flat, hs, activation_fn=activation_fn, name='adv_hid')
 
         self.value, self.w['val_w_out'], self.w['val_w_b'] = \
           linear(self.value_hid, 1, name='value_out')
@@ -256,8 +265,9 @@ class Agent(BaseModel):
         self.q = self.value + (self.advantage - 
           tf.reduce_mean(self.advantage, reduction_indices=1, keep_dims=True))
       else:
-        self.l4, self.w['l4_w'], self.w['l4_b'] = linear(self.l3_flat, 512, activation_fn=activation_fn, name='l4')
-        self.q, self.w['q_w'], self.w['q_b'] = linear(self.l4, self.env.action_size, name='q')
+        self.l4, self.w['l4_w'], self.w['l4_b'] = linear(self.l3_flat, hidsize[0], activation_fn=activation_fn, name='l4')
+        lh = self.l4
+        self.q, self.w['q_w'], self.w['q_b'] = linear(lh, self.env.action_size, name='q')
 
       self.q_action = tf.argmax(self.q, dimension=1)
 
@@ -277,21 +287,20 @@ class Agent(BaseModel):
             [None, self.history_length, self.screen_width, self.screen_height], name='target_s_t')
 
       self.target_l1, self.t_w['l1_w'], self.t_w['l1_b'] = conv2d(self.target_s_t, 
-          32, [8, 8], [4, 4], initializer, activation_fn, self.cnn_format, name='target_l1')
+          output_dims[0], hw[0], strides[0], initializer, activation_fn, self.cnn_format, name='target_l1')
       self.target_l2, self.t_w['l2_w'], self.t_w['l2_b'] = conv2d(self.target_l1,
-          64, [4, 4], [2, 2], initializer, activation_fn, self.cnn_format, name='target_l2')
+          output_dims[1], hw[1], strides[1], initializer, activation_fn, self.cnn_format, name='target_l2')
       self.target_l3, self.t_w['l3_w'], self.t_w['l3_b'] = conv2d(self.target_l2,
-          64, [3, 3], [1, 1], initializer, activation_fn, self.cnn_format, name='target_l3')
+          output_dims[2], hw[2], strides[2], initializer, activation_fn, self.cnn_format, name='target_l3')
 
       shape = self.target_l3.get_shape().as_list()
       self.target_l3_flat = tf.reshape(self.target_l3, [-1, reduce(lambda x, y: x * y, shape[1:])])
 
       if self.dueling:
         self.t_value_hid, self.t_w['l4_val_w'], self.t_w['l4_val_b'] = \
-            linear(self.target_l3_flat, 512, activation_fn=activation_fn, name='target_value_hid')
-
+          linear(self.target_l3_flat, hs, activation_fn=activation_fn, name='target_value_hid')
         self.t_adv_hid, self.t_w['l4_adv_w'], self.t_w['l4_adv_b'] = \
-            linear(self.target_l3_flat, 512, activation_fn=activation_fn, name='target_adv_hid')
+          linear(self.target_l3_flat, hs, activation_fn=activation_fn, name='target_adv_hid')
 
         self.t_value, self.t_w['val_w_out'], self.t_w['val_w_b'] = \
           linear(self.t_value_hid, 1, name='target_value_out')
@@ -304,9 +313,10 @@ class Agent(BaseModel):
           tf.reduce_mean(self.t_advantage, reduction_indices=1, keep_dims=True))
       else:
         self.target_l4, self.t_w['l4_w'], self.t_w['l4_b'] = \
-            linear(self.target_l3_flat, 512, activation_fn=activation_fn, name='target_l4')
+            linear(self.target_l3_flat, hidsize[0], activation_fn=activation_fn, name='target_l4')
+        lh = self.target_l4
         self.target_q, self.t_w['q_w'], self.t_w['q_b'] = \
-            linear(self.target_l4, self.env.action_size, name='target_q')
+            linear(lh, self.env.action_size, name='target_q')
 
       self.target_q_idx = tf.placeholder('int32', [None, None], 'outputs_idx')
       self.target_q_with_idx = tf.gather_nd(self.target_q, self.target_q_idx)
@@ -347,6 +357,7 @@ class Agent(BaseModel):
                              #for _ in _]
       self.sgd_rule= tf.train.RMSPropOptimizer(
           self.learning_rate_op, momentum=0.95, epsilon=0.01)
+      #self.sgd_rule= tf.train.AdamOptimizer(learning_rate=self.learning_rate_opt)
       self.optim = self.sgd_rule.minimize(self.loss)
       
       gm_summary = []
@@ -380,9 +391,12 @@ class Agent(BaseModel):
 
     self._saver = tf.train.Saver(self.w.values() + [self.step_op], max_to_keep=30)
 
-    if True:
+    if self.load_weights:
       self.load_model()
-      self.wp = {k:v.eval(self.sess) for k, v in self.w.iteritems()}
+    else:
+      import pdb; pdb.set_trace()
+      print "WARNING: NOT LOADING WEIGHTS."
+    self.wp = {k:v.eval(self.sess) for k, v in self.w.iteritems()}
     self.update_target_q_network()
 
   def update_target_q_network(self):
@@ -416,6 +430,20 @@ class Agent(BaseModel):
     })
     for summary_str in summary_str_lists:
       self.writer.add_summary(summary_str, self.step)
+    if self.folder_name not in os.listdir('./txt/'):
+      os.mkdir('./txt/{}'.format(self.folder_name))
+    with open("./txt/{}/epochs.txt".format(self.folder_name), mode='a') as f:
+      s = "{step} {e_avg_r} {e_max_r} {e_min_r} {e_num_g} {avg_l} {avg_q} {avg_r} \n".format(
+        step = self.step,
+        e_avg_r = tag_dict["episode.avg reward"],
+        e_max_r = tag_dict["episode.max reward"],
+        e_min_r = tag_dict["episode.min reward"],
+        e_num_g = tag_dict["episode.num of game"],
+        avg_l = tag_dict["average.loss"],
+        avg_q = tag_dict["average.q"],
+        avg_r = tag_dict["average.reward"]
+      )
+      f.write(s)
 
   def play(self, n_step=10000, n_episode=100, test_ep=None, render=False):
     if test_ep == None:
