@@ -12,9 +12,14 @@ import numpy as np
 parser = argparse.ArgumentParser()
 
 # encoding models
-parser.add_argument('--similarity_time',type=str,default='16-11-06')
-parser.add_argument('--autoencoder_time',type=str,default='00-00-00')
-parser.add_argument('--dqnencoder_time',type=str,default='16-11-06')
+parser.add_argument('--similarity_time',type=str,default='0')
+
+#parser.add_argument('--dqnencoder_time',type=str,default='16-11-11-07-04PM') # random weights
+parser.add_argument('--dqnencoder_time',type=str,default='16-11-11-07-06PM') # trained network
+
+#parser.add_argument('--N',type=int,default=None)
+
+#16-11-10-07-18PM
 
 # hyperparameters
 parser.add_argument('--batch_size',type=int,default=20)
@@ -51,20 +56,27 @@ dqnencoder_weights = dqnencoder_saver.load_dictionary(0,'encoder')
 #with tf.variable_scope('baseline'):
     #baseline_encoder = AutoEncoder(20)
 with tf.variable_scope('reinforc'):
-    reinforc_encoder = AutoEncoder(20)
+    reinforc_encoder = AutoEncoder(20, supervised=False)
 
 with tf.Session() as sess:
     #baseline_encoder.load_weights(autoencoder_weights)
+    sess.run(tf.initialize_all_variables())
     reinforc_encoder.load_weights(dqnencoder_weights)
     #W = DQN_ENCODER.get_weights()
     #reinforc_encoder.load_weights(AGENT_PARAMS_DICT)
 
-    for layer in reinforc_encoder.layers.keys():
+    keys = ['l1_flat','l2_flat','l3_flat','adv_hid','value_hid']
+    for j, layer in enumerate(keys):
         #bZ1 = []
         #bZ2 = []
         rZ1 = []
         rZ2 = []
         for i in range(0,N,args.batch_size):
+            if i % 1000 == 0:
+                print("Layer: {} of {} == Example: {} of {}".format(j,
+                                                                    len(keys),
+                                                                    i,N)
+                      )
             X1_batch = X1[i:i+args.batch_size]
             X2_batch = X2[i:i+args.batch_size]
             
@@ -88,5 +100,6 @@ with tf.Session() as sess:
              'rZ2':RZ2}
         encoding_saver.save_dict(0, D, name="{}_encodings".format(layer))
     encoding_saver.save_dict(0, simi_data, name='simi_data')
+    encoding_saver.save_args(args)
     
 halt= True

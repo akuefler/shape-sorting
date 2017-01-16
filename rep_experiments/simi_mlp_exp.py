@@ -38,6 +38,7 @@ assert args.batch_size == 20
     
 simidata_saver = Saver(time=args.simi_data_time,path='{}/{}'.format(DATADIR,'simi_data'))
 modelsaver = Saver(path='{}/{}'.format(DATADIR,'classifier'))
+#modelsaver = None
 
 D = simidata_saver.load_dictionary(0,'data')
 #XV = simidata_saver.load_value(0,'valid')
@@ -60,8 +61,9 @@ if args.n_channels > 1:
     
     ## real data
     try:
-        p = np.random.choice(X1.shape[0],50 * 1000,replace=False)
+        #p = np.random.choice(X1.shape[0],50 * 1000,replace=False)
         #p = np.random.choice(X1.shape[0],20 * 100,replace=False)
+        p = np.random.choice(X1.shape[0], 20 * 1000,replace=False)        
         
     except ValueError:
         print("Using {} datapoint instead ... ".format(X1.shape[0]))
@@ -108,7 +110,7 @@ if args.train:
             dqnencoder_weights = dqnencoder_saver.load_dictionary(0,'encoder')
             model.load_weights(dqnencoder_weights)        
 
-        train(model, XT, YT, XV, YV, saver=modelsaver,epochs=args.epochs)
+        train(model, XT, YT, XV, YV, saver=modelsaver, epochs=args.epochs)
         
         pt, lt = model.predict(XT)
         pv, lv = model.predict(XV)

@@ -13,7 +13,8 @@ flags = tf.app.flags
 
 # Model
 flags.DEFINE_string('model', 'm1', 'Type of model')
-flags.DEFINE_boolean('dueling', True, 'Whether to use dueling deep q-network')
+dueling= True
+flags.DEFINE_boolean('dueling', dueling, 'Whether to use dueling deep q-network')
 flags.DEFINE_boolean('double_q', False, 'Whether to use double q-learning')
 
 # Environment
@@ -21,10 +22,14 @@ flags.DEFINE_boolean('double_q', False, 'Whether to use double q-learning')
 #flags.DEFINE_string('env_name', 'CartPole-v0', 'The name of gym environment to use')
 flags.DEFINE_string('env_name', 'shapesort', 'The name of gym environment to use')
 flags.DEFINE_string('env_type', 'shapesort', 'environment type?')
-flags.DEFINE_string('game_settings', 1, 'game settings')
+game_settings = 1
+flags.DEFINE_string('game_settings', game_settings, 'game settings')
 flags.DEFINE_integer('action_repeat', 1, 'The number of action to be repeated')
 
-flags.DEFINE_string('folder_name', 'november30_dueling_settings1', 'The name of the folder to save to.')
+name = "october28_dueling_settings1"
+#name = 'december08_duel{dueling}_settings{settings}_unitElu'.format(dueling=int(dueling),settings=game_settings)
+
+flags.DEFINE_string('folder_name', name, 'The name of the folder to save to.')
 #flags.DEFINE_string('folder_name', 'july17', 'The name of the folder to save to.')
 
 #flags.DEFINE_string('folder_name', 'breakout_test', 'The name of the folder to save to.')

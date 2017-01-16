@@ -242,14 +242,14 @@ class ShapeSorter(object):
             
         if 'rotate_cw' in agent_events and self.state['target']:
             self.state['target'].rotate(-self.rot_size)
-            reward += 0.1 / self.n_blocks
+            reward += REWARD_DICT['hold_block'] / self.n_blocks
             
             #shield = (cursorPos[0]-15, cursorPos[1]-15, 30, 30)
             #pygame.draw.arc(self.screen, OUTLINE, shield, pi/2, 3*pi/2, 15)            
         
         if 'rotate_ccw' in agent_events and self.state['target']:
             self.state['target'].rotate(self.rot_size)
-            reward += 0.1 / self.n_blocks
+            reward += REWARD_DICT['hold_block'] / self.n_blocks
             
             #shield = (cursorPos[0]-15, cursorPos[1]-15, 30, 30)
             #pygame.draw.arc(self.screen, OUTLINE, shield, 3*pi/2, pi/2, 15)            
@@ -386,6 +386,8 @@ def main(smooth= False, **kwargs):
                 actions.append('none')
                 
             _,reward,done,info = ss.step(actions)
+            #if reward != 0.0:
+                #print(reward)
             #plt.imshow(_)
             #plt.show()
             ss.render()
@@ -396,4 +398,4 @@ def main(smooth= False, **kwargs):
 if __name__ == '__main__':
     h = Hexagon(RED, (0.,0.), 30, 'block', angle = 0.0)
     from game_settings import SHAPESORT_ARGS0, SHAPESORT_ARGS1, SHAPESORT_ARGS2
-    X = main(smooth= False, **SHAPESORT_ARGS2) # Execute our main function
+    X = main(smooth= False, **SHAPESORT_ARGS1) # Execute our main function

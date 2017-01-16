@@ -14,7 +14,7 @@ from collections import Counter
 
 parser = argparse.ArgumentParser()
 #parser.add_argument('--encoding_time',type=str,default='16-11-11-07-17PM')
-parser.add_argument('--encoding_time',type=str,default='16-11-11-07-18PM')
+parser.add_argument('--encoding_time',type=str,default='2')
 #parser.add_argument('--encoding_time',type=str,default='16-11-11-08-31PM')
 
 parser.add_argument('--classification',type=bool,default=False)
@@ -88,7 +88,7 @@ for encoding in args.encodings:
     layer_profile = LayerProfile()
     neuron_profiles = []
     for neuron in xrange(X.shape[1]):
-        print "{} of {}".format(neuron,X.shape[1])
+        #print "{} of {}".format(neuron,X.shape[1])
         neuron_profile = NeuronProfile()
         
         sts.append(
@@ -120,6 +120,7 @@ for encoding in args.encodings:
     #print npp.preferred_shape
     ##print npp.num_responsive
     
+print("ET: {}".format(args.encoding_time))
 for k, v in layer_profiles.iteritems():
     print "{} : {}".format(k,v.average_responsiveness)
          

@@ -94,23 +94,28 @@ SHAPESORT_ARGS1 = dict(
         random_cursor=True,
         random_holes=True,
         step_size=20,
-        rot_size=30
+        rot_size=30,
+        screen_HW=200,
+        screen_rHW=84,
+        cursor_size=10
     )
 
-SHAPESORT_ARGS2 = dict(
-        act_mode='discrete',
-        grab_mode='toggle',
-        shapes=[Trapezoid, RightTri, Hexagon, Tri, Rect],
-        sizes=[20,20,20,20,20],
-        n_blocks=3,
-        random_cursor=True,
-        random_holes=True,
-        step_size=8,
-        rot_size=30,
-        screen_HW=80,
-        screen_rHW=42,
-        cursor_size=5
-    )
+#SHAPESORT_ARGS2 = dict(
+        #act_mode='discrete',
+        #grab_mode='toggle',
+        #shapes=[Trapezoid, RightTri, Hexagon, Tri, Rect],
+        #sizes=[20,20,20,20,20],
+        #n_blocks=3,
+        #random_cursor=True,
+        #random_holes=True,
+        #step_size=8,
+        #rot_size=30,
+        #screen_HW=80,
+        #screen_rHW=42,
+        #cursor_size=5
+    #)
+
+SHAPESORT_ARGS2 = []
 
 #SHAPESORT_ARGS2 = dict(
         #act_mode='discrete',

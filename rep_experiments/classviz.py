@@ -28,11 +28,12 @@ parser.add_argument('--n_channels',type=int,default=4)
 parser.add_argument('--train',type=bool,default=False)
 
 # training
-parser.add_argument('--epochs',type=int,default=100)
+parser.add_argument('--epochs',type=int,default=10000)
 parser.add_argument('--batch_size',type=int,default=20)
 
 #parser.add_argument('--simi_data_time',type=str,default="16-11-10-01-13AM")
-parser.add_argument('--encoding_time',type=str,default='16-11-11-07-18PM')
+parser.add_argument('--encoding_time',type=str,default='0')
+parser.add_argument('--encoding_layer',type=str,default='l2_flat')
 
 args = parser.parse_args()
 
@@ -43,17 +44,17 @@ modelsaver= None
 
 encoding_saver = Saver(time=args.encoding_time,path='{}/{}'.format(DATADIR,'enco_simi_data'))
 #Y = encoding_saver.load_value(0,'Y')
-D = encoding_saver.load_dictionary(0, 'l3_flat_encodings') # more overfitting, more validation accuracy
+#D = encoding_saver.load_dictionary(0, 'l3_flat_encodings') # more overfitting, more validation accuracy
 #D = encoding_saver.load_dictionary(0, 'l2_flat_encodings') 
 #D = encoding_saver.load_dictionary(0, 'adv_hid_encodings')
 #D = encoding_saver.load_dictionary(0, args.encoding)
 
 simi_data = encoding_saver.load_dictionary(0,'simi_data')
-Y = simi_data['Y']
-X = np.concatenate([simi_data['X1'],simi_data['X2']],axis=0)
-SHAPES = np.concatenate([simi_data['SHAPES1'],simi_data['SHAPES2']])
+X = simi_data['X1']
+SHAPES = simi_data['SHAPES1']
 
 N = X.shape[0]
+N = 50
 cutoff = int(0.7 * N)
 
 p = np.random.permutation(range(N))
@@ -66,11 +67,9 @@ Y_t = SHAPES[:cutoff]
 X_v = X[cutoff:]
 Y_v = SHAPES[cutoff:]
 
-A = np.random.normal(X_t.mean(axis=0), X_t.std(axis=0))
-
 # [Trapezoid, RightTri, Hexagon, Tri, Rect]
 def initializer(shape, dtype=None, partition_info=None):
-    return np.random.normal(X_t.mean(axis=0), X_t.std(axis=0))[None,...]
+    return np.random.normal(X_t.mean(axis=0), X_t.std(axis=0) + 1e-8)[None,...]
 
 # no weights: 46, 37
 
@@ -89,24 +88,40 @@ dqnencoder_weights = dqnencoder_saver.load_dictionary(0,'encoder')
         
 halt= True
 
-model = Simonyan(5,top_layer='adv_hid', dueling=True, reg=0.01, I_initializer= initializer)
+model = Simonyan(5,top_layer=args.encoding_layer, dueling=True, reg=0.01, I_initializer= initializer)
 with tf.Session() as sess:
     sess.run(tf.initialize_all_variables())
     model.load_weights(dqnencoder_weights)
     #model.train(X_t, Y_t, X_v, Y_v, epochs=200)
     
+    Z_t = model.encode(X_t, layer=args.encoding_layer)
+    Z_v = model.encode(X_v, layer=args.encoding_layer)    
+    
     import h5py
-    with h5py.File('svm_weights.h5','r') as hf:
+    if args.train:
+        sk_model = LogisticRegression(solver='sag',multi_class='multinomial')
+        #sk_model = SVC(kernel='linear')
+        #sk_model = LinearSVC(dual=False, C=0.1)
+        sk_model.fit(Z_t, Y_t)
+        
+        skp_t = sk_model.predict(Z_t)
+        skp_v = sk_model.predict(Z_v)
+        
+        print "Logistic: "
+        print "Train Acc: {}".format(accuracy_score(Y_t, skp_t))
+        print "Valid Acc: {}".format(accuracy_score(Y_v, skp_v))
+        
+        with h5py.File('lr_weights_grab{}_{}.h5'.format(args.encoding_time,args.encoding_layer),'a') as hf:
+            #w = hf['w'][...]
+            #b = hf['b'][...]
+            hf.create_dataset("w",data=sk_model.coef_.T)
+            hf.create_dataset("b",data=sk_model.intercept_)        
+    
+        assert False
+    with h5py.File('lr_weights_grab{}_{}.h5'.format(args.encoding_time,
+                                                    args.encoding_layer),'r') as hf:
         w = hf['w'][...]
         b = hf['b'][...]
-        
-    Z_t = model.encode(X_t, layer='adv_hid')
-    Z_v = model.encode(X_v, layer='adv_hid')
-    
-    #sk_model = LogisticRegression(solver='sag',multi_class='multinomial')
-    #sk_model = SVC(kernel='linear')
-    sk_model = LinearSVC(dual=False, C=0.1)
-    #sk_model.fit(Z_t, Y_t)
     
     #ops = [model.cls_w.assign(sk_model.coef_.T),model.cls_b.assign(sk_model.intercept_)]
     ops = [model.cls_w.assign(w),model.cls_b.assign(b)]    
@@ -117,7 +132,13 @@ with tf.Session() as sess:
     
     #print "Logistic: "
     #print "Train Acc: {}".format(accuracy_score(Y_t, skp_t))
-    #print "Valid Acc: {}".format(accuracy_score(Y_v, skp_v))    
+    #print "Valid Acc: {}".format(accuracy_score(Y_v, skp_v))
+    
+    #with h5py.File('lr_weights.h5','a') as hf:
+        ##w = hf['w'][...]
+        ##b = hf['b'][...]
+        #hf.create_dataset("w",data=sk_model.coef_.T)
+        #hf.create_dataset("b",data=sk_model.intercept_)
     
     p_t, l_t = model.predict(X_t)
     p_v, l_v = model.predict(X_v)
@@ -129,7 +150,7 @@ with tf.Session() as sess:
     Is = []
     for i in range(5):
         #I = model.visprop(cls_ix=i,epochs=1)
-        I = model.visprop(cls_ix=i,epochs=10000)
+        I = model.visprop(cls_ix=i,epochs=args.epochs)
         
         p_i, l_i = model.predict(I)
         print "Predicted for I: {}".format(p_i)
@@ -138,9 +159,12 @@ with tf.Session() as sess:
 f, axs = plt.subplots(5,4)
 plt.tight_layout()
 axs
+labels = ["Trapezoid", "Right Tri.", "Hexagon", "Equil. Tri.", "Square"]
 for i, axrow in enumerate(axs):
     I = Is[i]
     for j, ax in enumerate(axrow):
+        if j == 0:
+            ax.set_ylabel(labels[i])
         ax.set_xticks([])
         ax.set_yticks([])
         ax.set_xticklabels([])

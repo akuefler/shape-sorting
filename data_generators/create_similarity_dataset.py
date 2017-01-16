@@ -7,20 +7,26 @@ from game_settings import SHAPESORT_ARGS
 import matplotlib.pyplot as plt
 
 from game import process_observation
-import pygame
+import pygame as pg
 
 from sandbox.util import Saver
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--vary_pos',type=bool,default=False)
 parser.add_argument('--vary_ang',type=bool,default=True)
-parser.add_argument('--vary_size',type=bool,default=True)
+parser.add_argument('--vary_size',type=bool,default=False)
 
-parser.add_argument('--shapesort_args',type=int)
+parser.add_argument('--shapesort_args',type=int,default=1)
 parser.add_argument('--shapes',type=str,nargs='+')
 parser.add_argument('--sizes',type=int,nargs='+')
 
-parser.add_argument('--N',type=int,default=1000) # size of dataset
+parser.add_argument('--size_lb',type=int,default=35)
+parser.add_argument('--size_ub',type=int,default=85)
+
+parser.add_argument('--grab',type=int,default=0)
+parser.add_argument('--hole',type=int,default=0)
+
+parser.add_argument('--N',type=int,default=50000) # size of dataset
 
 args = parser.parse_args()
 
@@ -32,6 +38,9 @@ else:
     sizes = SHAPESORT_ARGS[args.shapesort_args]['sizes']
     rot_size = SHAPESORT_ARGS[args.shapesort_args]['rot_size']
     step_size = SHAPESORT_ARGS[args.shapesort_args]['step_size']
+    cursor_size = SHAPESORT_ARGS[args.shapesort_args]['cursor_size']
+    HW = SHAPESORT_ARGS[args.shapesort_args]['screen_HW']    
+    rHW = SHAPESORT_ARGS[args.shapesort_args]['screen_rHW']
     
 X1 = []
 X2 = []
@@ -50,7 +59,24 @@ POSITS2 = []
 H = 200
 W = 200
 
+if args.hole == 0:
+    shape_col = RED
+elif args.hole == 1:
+    shape_col = BLACK
+else:
+    raise NotImplementedError
+
+if args.grab == 0:
+    col = RED
+elif args.grab == 1:
+    col = GREEN
+elif args.grab == 2:
+    col = BLUE
+else:
+    raise NotImplementedError
+
 for i in range(args.N):
+    print "{} of {}".format(i,args.N)
     screen = pg.display.set_mode((H, W))
     screen.fill(WHITE)  
     
@@ -85,23 +111,29 @@ for i in range(args.N):
         offset2 = 0.0
         
     if args.vary_size:
-        size1 = np.random.randint(40,70)
-        size2 = np.random.randint(40,70)
+        size1 = np.random.randint(args.size_lb,args.size_ub) # 40, 70
+        size2 = np.random.randint(args.size_lb,args.size_ub)
     
     # generate first image
-    block1 = shape1(BLACK, np.array([H,W])/2. + offset1, size1, 'block', angle=ang1)
+    center1 = np.array([H,W])/2. + offset1
+    block1 = shape1(shape_col, center1, size1, 'block', angle=ang1)
     block1.render(screen)
-    x1 = process_observation(screen)[None,...]
+    pg.draw.circle(screen, col, center1.astype('int32'), cursor_size)
+    
+    x1 = process_observation(screen,HW,rHW)[None,...]
     X1.append(x1)
     
     screen.fill(WHITE)
     
     # generate second image
-    block2 = shape2(BLACK, np.array([H,W])/2. + offset2, size2, 'block', angle=ang2)
+    center2 = np.array([H,W])/2. + offset2
+    block2 = shape2(shape_col, center2, size2, 'block', angle=ang2)
     block2.render(screen)
-    x2 = process_observation(screen)[None,...]
-    X2.append(x2)
+    pg.draw.circle(screen, col, center2.astype('int32'), cursor_size)    
     
+    x2 = process_observation(screen,HW,rHW)[None,...]
+    X2.append(x2)
+        
     SHAPES1.append(shapes.index(shape1))
     SIZES1.append(size1)
     ANGLES1.append(ang1)

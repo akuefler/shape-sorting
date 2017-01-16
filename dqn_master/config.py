@@ -41,13 +41,14 @@ class AgentConfig(object):
   _test_step = 5 * scale
   #_save_step = 250 * scale
   _save_step = 125 * scale
-  
 
 class EnvironmentConfig(object):
   env_name = 'Breakout-v0'
 
-  screen_width  = 42
-  screen_height = 42
+  #screen_width  = 42
+  #screen_height = 42
+  screen_width = 84
+  screen_height = 84
   max_reward = 1000.
   min_reward = -1000.
   
