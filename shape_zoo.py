@@ -68,8 +68,9 @@ class Rect(PolyBlock):
         third= self.size/3
         self.vertices=self.V= np.array([[-third,third],[third,third],[third,-third],[-third,-third]])
         
-        self.rotate(self.angle)
+        self.rotate(self.angle)        
         
+        self.matching_angles = (np.linspace(0,360,5)[:-1] + self.angle) % 360        
         
 class Tri(PolyBlock):
     def __init__(self, color, center, size, typ, angle = 0.0, **kwargs):
@@ -83,8 +84,11 @@ class Tri(PolyBlock):
         
         v -= v.mean(axis= 0)
         self.vertices = self.V = v
-        self.rotate(self.angle)
         
+        self.rotate(self.angle)        
+        
+        self.matching_angles = (np.linspace(0,360,4)[:-1] + self.angle) % 360
+                
 class Hexagon(PolyBlock):
     def __init__(self, color, center, size, typ, angle = 0.0, **kwargs):
         PolyBlock.__init__(self, color, center, size, typ, angle)
@@ -95,8 +99,11 @@ class Hexagon(PolyBlock):
         R = lambda x : np.array([[np.cos(x),-np.sin(x)],
                                  [np.sin(x),np.cos(x)]])
         self.vertices= self.V = np.row_stack([np.dot(u,R(theta)) for theta in thetas])
-        self.rotate(angle)
         
+        self.rotate(angle)        
+        
+        self.matching_angles = (np.linspace(0,360,7)[:-1] + self.angle) % 360
+                
 class RightTri(PolyBlock):
     def __init__(self, color, center, size, typ, angle = 0.0, **kwargs):
         PolyBlock.__init__(self, color, center, size, typ, angle)
@@ -104,8 +111,11 @@ class RightTri(PolyBlock):
         v = np.array([[0.,0.],[0.,size],[size,0.]])
         v -= v.mean(axis=0)
         self.vertices = self.V = v
-        self.rotate(angle)
-      
+        
+        self.rotate(angle)        
+        
+        self.matching_angles = np.array([self.angle])
+              
 class Trapezoid(PolyBlock):  
     def __init__(self, color, center, size, typ, angle = 0.0, **kwargs):
         PolyBlock.__init__(self, color, center, size, typ, angle)
@@ -116,8 +126,11 @@ class Trapezoid(PolyBlock):
                       [int(0.33 * size),int(0.66*size)]])
         v -= v.mean(axis=0)
         self.vertices = self.V = v
-        self.rotate(angle)
         
+        self.rotate(angle)        
+        
+        self.matching_angles = np.array([self.angle])
+                
 # more shapes ...
 
 class Star(PolyBlock):
