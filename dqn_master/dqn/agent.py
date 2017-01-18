@@ -11,6 +11,8 @@ from .ops import linear, conv2d
 from .replay_memory import ReplayMemory
 from utils import get_time, save_pkl, load_pkl
 
+from collections import Counter
+
 class Agent(BaseModel):
   def __init__(self, config, environment, sess, load_weights= True):
     super(Agent, self).__init__(config)
@@ -445,44 +447,51 @@ class Agent(BaseModel):
       )
       f.write(s)
 
-  def play(self, n_step=10000, n_episode=100, test_ep=None, render=False):
+  def play(self, experiment, n_step=10000, n_episode=2500, test_ep=None, render=False):
     if test_ep == None:
       test_ep = self.ep_end
 
     test_history = History(self.config)
 
-    if not self.display:
-      gym_dir = '/tmp/%s-%s' % (self.env_name, get_time())
-      self.env.env.monitor.start(gym_dir)
-
-    best_reward, best_idx = 0, 0
-    for idx in xrange(n_episode):
-      screen, reward, action, terminal = self.env.new_random_game()
-      current_reward = 0
+    winners, losers = [], []
+    steps_min, steps_taken = [], []
+    for idx in tqdm(range(n_episode), ncols=70):
+      screen = self.env.reset()
 
       for _ in range(self.history_length):
         test_history.add(screen)
 
-      for t in tqdm(range(n_step), ncols=70):
+      #for t in tqdm(range(n_step), ncols=70):
+      for t in range(n_step):
         # 1. predict
         action = self.predict(test_history.get(), test_ep)
         # 2. act
-        screen, reward, terminal = self.env.act(action, is_training=False)
+        screen, reward, terminal, info = self.env.step(action)
         # 3. observe
         test_history.add(screen)
+        
+        if self.display:
+          self.env.render()        
 
-        current_reward += reward
         if terminal:
+          winners.append(info['winner'])          
+          if experiment == "preference":
+            losers.append(info['loser'])
+          if experiment == "one_block":
+            steps_min.append(info['n_steps_min'])
+            steps_taken.append(info['n_steps'])
           break
 
-      if current_reward > best_reward:
-        best_reward = current_reward
-        best_idx = idx
+    #import pdb; pdb.set_trace()
+    if experiment == "preference":
+      print("Winners: ")
+      print(Counter(winners))
+      print("Losers: ")
+      print(Counter(losers))
+    if experiment == "one_block":
+      stats = zip(winners,steps_min,steps_taken)
+      diff = [c - b for (a, b, c) in stats]
 
-      print "="*30
-      print " [%d] Best reward : %d" % (best_idx, best_reward)
-      print "="*30
-
-    if not self.display:
-      self.env.env.monitor.close()
+      halt= True
+    
       #gym.upload(gym_dir, writeup='https://github.com/devsisters/DQN-tensorflow', api_key='')

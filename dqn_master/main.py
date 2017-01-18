@@ -22,7 +22,7 @@ flags.DEFINE_boolean('double_q', False, 'Whether to use double q-learning')
 #flags.DEFINE_string('env_name', 'CartPole-v0', 'The name of gym environment to use')
 flags.DEFINE_string('env_name', 'shapesort', 'The name of gym environment to use')
 flags.DEFINE_string('env_type', 'shapesort', 'environment type?')
-game_settings = 1
+game_settings = 2
 flags.DEFINE_string('game_settings', game_settings, 'game settings')
 flags.DEFINE_integer('action_repeat', 1, 'The number of action to be repeated')
 
@@ -39,7 +39,8 @@ flags.DEFINE_string('folder_name', name, 'The name of the folder to save to.')
 flags.DEFINE_boolean('use_gpu', True, 'Whether to use gpu or not')
 flags.DEFINE_string('gpu_fraction', '1/1', 'idx / # of gpu fraction e.g. 1/3, 2/3, 3/3')
 flags.DEFINE_boolean('display', True, 'Whether to do display the game screen or not')
-flags.DEFINE_boolean('is_train', True, 'Whether to do training or testing')
+#flags.DEFINE_boolean('is_train', True, 'Whether to do training or testing')
+
 flags.DEFINE_integer('random_seed', 123, 'Value of random seed')
 
 FLAGS = flags.FLAGS
@@ -62,6 +63,8 @@ def calc_gpu_fraction(fraction_string):
 def main(_):
   gpu_options = tf.GPUOptions(
       per_process_gpu_memory_fraction=calc_gpu_fraction(FLAGS.gpu_fraction))
+  from game_settings import SHAPESORT_ARGS
+  settings = SHAPESORT_ARGS[FLAGS.game_settings]
 
   with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
     config = get_config(FLAGS) or FLAGS
@@ -69,9 +72,7 @@ def main(_):
     if config.env_type == 'simple':
       env = SimpleGymEnvironment(config)
     if config.env_type =='shapesort':
-      from game_settings import SHAPESORT_ARGS
-      env = ShapeSorterEnvironment(config,
-                                   SHAPESORT_ARGS[FLAGS.__dict__['__flags']['game_settings']])
+      env = ShapeSorterEnvironment(config, settings)
     else:
       env = GymEnvironment(config)
 
@@ -80,10 +81,10 @@ def main(_):
 
     agent = Agent(config, env, sess)
 
-    if FLAGS.is_train:
+    if settings["experiment"] in ["training"]:
       agent.train()
-    else:
-      agent.play()
+    elif settings["experiment"] in ["preference","one_block"]:
+      agent.play(settings["experiment"])
       
 def get_agent(_, load_weights):
   with tf.Session() as sess:
