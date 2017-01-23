@@ -2,6 +2,8 @@ import gym
 from game_settings import SHAPESORT_ARGS0, SHAPESORT_ARGS1, SHAPESORT_ARGS2
 from game import ShapeSorter
 
+import numpy as np
+
 class ShapeSorterWrapper(ShapeSorter):
     
     def __init__(self):
@@ -37,3 +39,122 @@ def register_env():
     
     env = gym.make('ShapeSorter-v0')
     return env
+import os
+import h5py
+import json
+
+import datetime
+import calendar
+
+class Saver(object):    
+    def __init__(self,path=None,overwrite= False,time=None):
+        if time is None:
+            now = datetime.datetime.now()
+            #self.time = calendar.datetime.date.today().strftime('%y-%m-%d')
+            self.time = calendar.datetime.datetime.now().strftime('%y-%m-%d-%H-%M-%S-%f')
+        else:
+            self.time = time
+        
+        if path is None:
+            path = config.LOG_DIR
+        assert path[-1] != "/"
+        self._path = path + "/" + self.time + "/"
+            
+        #if not overwrite:
+            #existing_names = os.listdir(path)
+            #c = 0
+            #while name + "-{:05}".format(c) in existing_names:
+                #c += 1
+            #self._path += "-{:05}".format(c)+"/"
+            #os.mkdir(self._path)
+        #else:
+            #self._path += "/"
+        
+    def save_args(self,args):
+        #with h5py.File(self._path + "args.txt", 'a') as hf:
+        self.dircheck()
+        json.dump(vars(args), open(self._path + "args.txt",'a'))
+            
+    def save_dict(self,itr, d, name= ""):
+        self.dircheck()
+        with h5py.File(self._path + "epochs.h5", 'a') as hf:
+            for key, value in d.iteritems():
+                hf.create_dataset("iter{itr:05}{name}/".format(itr=itr,name="/"+name)+key,data=value)
+                
+    def save_recursive_dict(self, itr, d, name= ""):
+        def recurse(f, p, x):
+            for key, item in x.items():
+                if isinstance(item, (np.ndarray, np.int64, np.float64, str, bytes, list)):
+                    f[p + key] = item
+                elif isinstance(x, dict):
+                    recurse(hf, p + key + '/', item)
+                else:
+                    raise ValueError('Cannot save %s type'%type(item))             
+            
+        path = self._path
+        with h5py.File(path + "epochs.h5", 'a') as hf:
+            recurse(hf, name+"/", d)
+            
+            halt= True
+                
+    def save_models(self,itr,models):
+        self.dircheck()
+        with h5py.File(self._path + "epochs.h5",'a') as hf:
+            for model in models:
+                tensors = model.weights
+                weights = model.get_weights()
+                for tensor, weight in zip(tensors, weights):
+                    hf.create_dataset("iter{itr:05}/{model}/{tensor}".format(itr=itr,model=model.name,tensor=tensor.name),
+                                      data = weight)
+                    
+    def load_models(self,itr,models):
+        with h5py.File(self._path + "epochs.h5",'r') as hf:
+            keys = hf.keys()
+            for model in models:
+                saved_model= hf[keys[itr]][model.name]
+                L = []
+                for w in model.weights:
+                    saved_w = saved_model[w.name]
+                    L.append(saved_w)
+                    
+                model.set_weights(L)
+                
+        return models
+    
+    def load_value(self,itr,key):
+        with h5py.File(self._path + "epochs.h5",'r') as hf:
+            value = hf['iter{itr:05}'.format(itr=itr)][key][...]
+        return value
+    
+    def load_dictionary(self,itr,name):
+        with h5py.File(self._path + "epochs.h5",'r') as hf:
+            D = {k:v[...] for k, v in hf['iter{itr:05}'.format(itr=itr)][name].iteritems()}
+        return D
+    
+    def load_recursive_dictionary(self, name):
+        """
+        ....
+        """
+        def recurse(f, p):        
+            ans = {}
+            for key, item in f[p].items():
+                if isinstance(item, h5py._hl.dataset.Dataset):
+                    ans[key] = item.value
+                elif isinstance(item, h5py._hl.group.Group):
+                    ans[key] = recurse(f, p + key + '/')
+            return ans
+                
+        with h5py.File(self._path + "epochs.h5",'r') as hf:
+            D = recurse(hf, name + "/")
+        
+        return D    
+    
+    def dircheck(self):
+        if not os.path.isdir(self._path):
+            os.mkdir(self._path)
+            
+def vis(path):
+    with h5py.File(path,'r') as hf:
+        X = h5
+            
+    

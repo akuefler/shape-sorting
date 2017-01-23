@@ -174,6 +174,8 @@ class ShapeSorter(object):
                 b_ang = b.angle,
                 h_angs = h.matching_angles
             )
+            self.after_grab = False
+            self.actions_after_grab = []
 
         self.extra_trans = 0
         self.extra_rot = 0
@@ -194,35 +196,46 @@ class ShapeSorter(object):
         penalize = False
         self.screen.fill(WHITE)
         
+        act_category = -1
         if type(action) != list:
             if self.act_mode == 'discrete':
                 agent_events = self.act_map[action]
             elif self.act_mode == 'continuous':
                 raise NotImplementedError
         else:
-            agent_events = action
+            raise NotImplementedError
         
         if self.grab_mode != 'toggle':
             if 'grab' in agent_events:
                 self.state['grab'] = True
+                act_category = 0
             else:
                 self.state['grab'] = False
         else:
             if 'grab' in agent_events:
                 self.state['grab'] = not self.state['grab']
+                act_category = 0                
             
         if 'left' in agent_events:
             self.state['x_speed'] = x_speed = -self.step_size
+            act_category = 1
+            
         elif 'right' in agent_events:
             self.state['x_speed'] = x_speed = self.step_size
+            act_category = 1
+            
         else:
             self.state['x_speed'] = x_speed = 0
             
             
         if 'up' in agent_events:
             self.state['y_speed'] = y_speed = -self.step_size
+            act_category = 1
+            
         elif 'down' in agent_events:
             self.state['y_speed'] = y_speed = self.step_size
+            act_category = 1
+            
         else:
             self.state['y_speed'] = y_speed = 0
             
@@ -237,6 +250,8 @@ class ShapeSorter(object):
                 self.extra_trans += 1
             
         if 'rotate_cw' in agent_events and self.state['target']:
+            act_category = 2
+            
             if self.experiment == "one_block":
                 ng1 = angular_distance(self.state['target'].angle, self.init_geom["h_angs"], self.rot_size)
             self.state['target'].rotate(-self.rot_size)
@@ -248,6 +263,8 @@ class ShapeSorter(object):
             reward += REWARD_DICT['hold_block'] / self.n_blocks
                     
         if 'rotate_ccw' in agent_events and self.state['target']:
+            act_category = 2
+            
             if self.experiment == "one_block":
                 ng1 = angular_distance(self.state['target'].angle, self.init_geom["h_angs"], self.rot_size)            
             self.state['target'].rotate(self.rot_size)
@@ -260,6 +277,9 @@ class ShapeSorter(object):
             
         if 'rotate_cw' in agent_events or 'rotate_ccw' in agent_events and self.state['target'] == None:
             self.extra_rot += 1
+            
+        if self.after_grab:
+            self.actions_after_grab.append(act_category)
         
         #Penalize border hugging:
         if cursorPos[1] == self.W - 0.1*self.W or cursorPos[1] == self.W*0.1 or \
@@ -282,7 +302,9 @@ class ShapeSorter(object):
                         
                         self.state['target']=block # "pick up" block
                         self.state['bList'].append(self.state['bList'].pop(self.state['bList'].index(block)))
-                        #target.center=cursorPos
+                        
+                        if self.experiment == "one_block" and not self.after_grab:
+                            self.after_grab = True
                         
             if self.state['target'] is not None:
                 if self.experiment == "one_block":
@@ -342,8 +364,10 @@ class ShapeSorter(object):
                 info["extra_trans"] = diff - self.extra_rot
                 info["extra_rot"] = self.extra_rot
                 
-                if diff != 0:
-                    halt= True
+                info["actions_after_grab"] = self.actions_after_grab
+                
+                #if diff != 0:
+                    #halt= True
         
         observation = process_observation(self.screen,self.H,self.rHW)
         
@@ -351,7 +375,7 @@ class ShapeSorter(object):
     
     def reset(self):
         self.initialize()
-        observation, _, _, _ = self.step([])        
+        observation, _, _, _ = self.step(0)        
         return observation
     
     def render(self):

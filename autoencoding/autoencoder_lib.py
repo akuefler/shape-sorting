@@ -12,11 +12,10 @@ import random
 import matplotlib.pyplot as plt
 
 from game_settings import DISCRETE_ACT_MAP4
-from rllab.sampler.utils import rollout
 
 #assert K.backend() == 'tensorflow'
 
-from sandbox.util import Saver
+from util import Saver
 
 env = ShapeSorter(**SHAPESORT_ARGS[1])
 

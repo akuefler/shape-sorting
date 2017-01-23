@@ -13,6 +13,8 @@ from utils import get_time, save_pkl, load_pkl
 
 from collections import Counter
 
+from util import Saver
+
 class Agent(BaseModel):
   def __init__(self, config, environment, sess, load_weights= True):
     super(Agent, self).__init__(config)
@@ -447,7 +449,7 @@ class Agent(BaseModel):
       )
       f.write(s)
 
-  def play(self, experiment, n_step=10000, n_episode=2500, test_ep=None, render=False):
+  def play(self, experiment, data_dir, n_step=10000, n_episode=2500, test_ep=None, render=False):
     if test_ep == None:
       test_ep = self.ep_end
 
@@ -455,6 +457,9 @@ class Agent(BaseModel):
 
     winners, losers = [], []
     steps_min, steps_taken = [], []
+    
+    CMAT = np.zeros((len(self.env.shapes),len(self.env.shapes)))
+    actions_after_grab = []
     for idx in tqdm(range(n_episode), ncols=70):
       screen = self.env.reset()
 
@@ -477,9 +482,11 @@ class Agent(BaseModel):
           winners.append(info['winner'])          
           if experiment == "preference":
             losers.append(info['loser'])
+            CMAT[info['winner'],info['loser']] += 1
           if experiment == "one_block":
             steps_min.append(info['n_steps_min'])
             steps_taken.append(info['n_steps'])
+            actions_after_grab.append(info['actions_after_grab'])
           break
 
     #import pdb; pdb.set_trace()
@@ -488,10 +495,26 @@ class Agent(BaseModel):
       print(Counter(winners))
       print("Losers: ")
       print(Counter(losers))
+      
+      with h5py.File("preference_mat.h5","a") as hf:
+        hf.create_dataset("C",data=CMAT)      
+      
     if experiment == "one_block":
-      stats = zip(winners,steps_min,steps_taken)
+      stats = np.column_stack([np.array(winners),
+                              np.array(steps_min),
+                              np.array(steps_taken)])
+      actions_after_grab = np.array([np.array(a) for a in actions_after_grab])
       diff = [c - b for (a, b, c) in stats]
-
-      halt= True
-    
+      
+      one_block_saver = Saver(path='{}/{}'.format(data_dir,'one_block_results'))
+      D1 = {"stats":stats}
+      D2 = {"actions_after_grab": {str(k) : v for (k,v) in zip(range(len(actions_after_grab)),
+                                                          actions_after_grab)}}
+      one_block_saver.save_dict(0, D1, name="stats")
+      #one_block_saver.save_dict(0, D2, name="actions_after_grab")
+      one_block_saver.save_recursive_dict(0, D2, name="actions_after_grab")
+      
+      #one_block_saver.save_dict(0, stats, name="stats")
+      #one_block_saver.save_dict(0, actions_after_grab, name="actions_after_grab")
+      
       #gym.upload(gym_dir, writeup='https://github.com/devsisters/DQN-tensorflow', api_key='')

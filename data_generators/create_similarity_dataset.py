@@ -2,11 +2,11 @@ from shapesorting import *
 
 import argparse
 from shape_zoo import *
-from game_settings import SHAPESORT_ARGS
+from game_settings import SHAPESORT_ARGS, INITIALIZER_MAP
 
 import matplotlib.pyplot as plt
 
-from game import process_observation
+from game import process_observation, create_renderList
 import pygame as pg
 
 from sandbox.util import Saver

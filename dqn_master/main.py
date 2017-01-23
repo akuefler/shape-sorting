@@ -11,6 +11,8 @@ from game import ShapeSorter
 
 flags = tf.app.flags
 
+DATADIR="/home/alex/stanford_dev/thesis/win/shapesorting/data/"
+
 # Model
 flags.DEFINE_string('model', 'm1', 'Type of model')
 dueling= True
@@ -38,7 +40,7 @@ flags.DEFINE_string('folder_name', name, 'The name of the folder to save to.')
 
 flags.DEFINE_boolean('use_gpu', True, 'Whether to use gpu or not')
 flags.DEFINE_string('gpu_fraction', '1/1', 'idx / # of gpu fraction e.g. 1/3, 2/3, 3/3')
-flags.DEFINE_boolean('display', True, 'Whether to do display the game screen or not')
+flags.DEFINE_boolean('display', False, 'Whether to do display the game screen or not')
 #flags.DEFINE_boolean('is_train', True, 'Whether to do training or testing')
 
 flags.DEFINE_integer('random_seed', 123, 'Value of random seed')
@@ -84,7 +86,7 @@ def main(_):
     if settings["experiment"] in ["training"]:
       agent.train()
     elif settings["experiment"] in ["preference","one_block"]:
-      agent.play(settings["experiment"])
+      agent.play(settings["experiment"], data_dir= DATADIR)
       
 def get_agent(_, load_weights):
   with tf.Session() as sess:

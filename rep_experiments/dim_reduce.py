@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
+import matplotlib
 import matplotlib.pyplot as plt
 
 from config import DATADIR
@@ -12,26 +13,49 @@ from util import Saver
 
 parser = argparse.ArgumentParser()
 
+matplotlib.rcParams.update({'font.size': 22})
+
 ## includes holes
 #parser.add_argument("--data_time",type=str,default="17-01-19-07-59PM") # no grab
 #parser.add_argument("--data_time",type=str,default="17-01-19-09-27PM") # grab 1
 #parser.add_argument("--data_time",type=str,default="17-01-19-09-29PM") # grab 2
+
+#parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-19-07-59PM",
+                                                                  #"17-01-19-09-27PM",
+                                                                  #"17-01-19-09-29PM"])
 
 ## no holes
 #parser.add_argument("--data_time",type=str,default="17-01-19-09-35PM") # no grab
 #parser.add_argument("--data_time",type=str,default="17-01-19-09-36PM") # grab 1
 #parser.add_argument("--data_time",type=str,default="17-01-19-09-37PM") # grab 2
 
+#parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-19-09-35PM",
+                                                                  #"17-01-19-09-36PM",
+                                                                  #"17-01-19-09-37PM"])
+
 ## Fixed Position
-#parser.add_argument("--data_time",type=str,default="17-01-19-22-34-07-174659") # no grab
-parser.add_argument("--data_time",type=str,default="17-01-19-22-34-56-056347") # grab 1
-#parser.add_argument("--data_time",type=str,default="17-01-19-22-35-45-287050") # grab 2
+parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-19-22-34-07-174659",
+                                                                  "17-01-19-22-34-56-056347",
+                                                                  ])
+                                                                  #"17-01-19-22-35-45-287050"])
 
 ## Fixed Position, No Holes
 #parser.add_argument("--data_time",type=str,default="17-01-19-22-36-33-368248") # no grab
 #parser.add_argument("--data_time",type=str,default="17-01-19-22-37-16-244572") # grab 1
 #parser.add_argument("--data_time",type=str,default="17-01-19-22-37-58-907670") # grab 2
 
+#parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-19-22-36-33-368248",
+                                                                  #"17-01-19-22-37-16-244572",
+                                                                  #"17-01-19-22-37-58-907670"])
+                           
+## Holes, Enumerated
+#parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-20-21-12-51-477494",
+                                                                  #"17-01-20-21-13-10-048480",
+                                                                  #"17-01-20-21-13-35-095721"])
+## No Holes, Enumerated
+#parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-20-21-55-33-448895",
+                                                                  #"17-01-20-21-56-02-187089",
+                                                                  #"17-01-20-21-56-21-432451"])
 
 parser.add_argument("--encodings",nargs="+",type=str,default=["Z_l1_flat","Z_l2_flat","Z_l3_flat","Z_value_hid","Z_adv_hid"])
 
@@ -42,11 +66,8 @@ args = parser.parse_args()
 
 assert args.color_fn in ["shape","center","delta"]
 
-data_saver = Saver(time=args.data_time,path='{}/{}'.format(DATADIR,'scene_and_enco_data'))
-
-data = data_saver.load_dictionary(0,"data")
-blocks = data_saver.load_recursive_dictionary("blocks")
-holes = data_saver.load_recursive_dictionary("holes")
+data_savers = [Saver(time=data_time,path='{}/{}'.format(DATADIR,'scene_and_enco_data'))
+               for data_time in args.data_times]
 
 def color_from_1D(X):
     X = X.astype('float32')
@@ -74,31 +95,52 @@ def color_from_int(X):
                   [0.5,0.2,0.9]])
     return T[X]
 
-NN = data["X"].shape[0]
+f, axs = plt.subplots(len(data_savers),len(args.encodings), figsize=(2.5 * 20,20))
+xlabels = ["Conv1", "Conv2", "Conv3", "Val.", "Adv."]
+ylabels = ["No Cursor", "Grabbing"]
 
-BLOCK_CENTER = np.row_stack([np.array(blocks['{:0{}}'.format(i,len(str(NN)))]['center']) for i in range(NN)])
-BLOCK_SHAPE = np.concatenate([np.array(blocks['{:0{}}'.format(i,len(str(NN)))]['shape']) for i in range(NN)])
-b_ix = [list(holes['{:0{}}'.format(i,len(str(NN)))]['shape']).index(blocks['{:0{}}'.format(i,len(str(NN)))]['shape'])
-        for i in range(NN)]
-BLOCK_DELTAS = np.array([np.linalg.norm(holes['{:0{}}'.format(i,len(str(NN)))]['center'][b_ix[i]] - \
-                                              blocks['{:0{}}'.format(i,len(str(NN)))]['center']) for i in range(NN)])
+for j, data_saver in enumerate(data_savers):
 
-color_fns = {"center":color_from_2D(BLOCK_CENTER),
-             "shape":color_from_int(BLOCK_SHAPE),
-             "delta":color_from_1D(BLOCK_DELTAS)}
-
-C = color_fns[args.color_fn]
-
-models = {"pca":PCA(),"tsne":TSNE()}
-model = models[args.model]
-
-p = np.random.choice(range(NN),args.N,replace=False)
-f, axs = plt.subplots(1,len(args.encodings))
-for layer, ax in zip(args.encodings,axs):
-    G = model.fit_transform(data[layer][p])
-    ax.scatter(G[:,0],G[:,1],c=C[p],s=100)
+    data = data_saver.load_dictionary(0,"data")
+    blocks = data_saver.load_recursive_dictionary("blocks")
+    holes = data_saver.load_recursive_dictionary("holes")
     
+    NN = data["X"].shape[0]
+    
+    BLOCK_CENTER = np.row_stack([np.array(blocks['{:0{}}'.format(i,len(str(NN)))]['center']) for i in range(NN)])
+    BLOCK_SHAPE = np.concatenate([np.array(blocks['{:0{}}'.format(i,len(str(NN)))]['shape']) for i in range(NN)])
+    
+    #b_ix = [list(holes['{:0{}}'.format(i,len(str(NN)))]['shape']).index(blocks['{:0{}}'.format(i,len(str(NN)))]['shape'])
+            #for i in range(NN)]
+    #BLOCK_DELTAS = np.array([np.linalg.norm(holes['{:0{}}'.format(i,len(str(NN)))]['center'][b_ix[i]] - \
+                                                  #blocks['{:0{}}'.format(i,len(str(NN)))]['center']) for i in range(NN)])
+    
+    color_fns = {"center":color_from_2D(BLOCK_CENTER),
+                 "shape":color_from_int(BLOCK_SHAPE)}
+                 #"delta":color_from_1D(BLOCK_DELTAS)}
+    
+    C = color_fns[args.color_fn]
+    
+    models = {"pca":PCA(),"tsne":TSNE()}
+    model = models[args.model]
+    
+    p = np.random.choice(range(NN),args.N,replace=False)
+    for i, (layer, ax) in enumerate(zip(args.encodings,axs[j])):
+        if j == len(data_savers) - 1:
+            ax.set_xlabel(xlabels[i])
+        if i == 0:
+            ax.set_ylabel(ylabels[j])
+        
+        G = model.fit_transform(data[layer][p])
+        ax.scatter(G[:,0],G[:,1],c=C[p],s=85)
+        
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        
+f.legend()
+        
 plt.show()
 
-halt= True
 

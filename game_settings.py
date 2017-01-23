@@ -118,7 +118,21 @@ SHAPESORT_ARGS2 = dict(
         experiment="one_block"
     )
 
-SHAPESORT_ARGS3 = {}
+SHAPESORT_ARGS3 = dict(
+        act_mode='discrete',
+        grab_mode='toggle',
+        shapes=[Trapezoid, RightTri, Hexagon, Tri, Rect],
+        sizes=[60,60,60,60,60],
+        n_blocks=3,
+        random_cursor=False,
+        random_holes=True,
+        step_size=20,
+        rot_size=30,
+        screen_HW=200,
+        screen_rHW=84,
+        cursor_size=10,
+        experiment="preference"
+    )
 
 SHAPESORT_ARGS = [SHAPESORT_ARGS0, SHAPESORT_ARGS1, SHAPESORT_ARGS2, SHAPESORT_ARGS3]
 INITIALIZER_MAP = {"training":standard_initializer,"preference":preference_initializer,"one_block":standard_initializer}

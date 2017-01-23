@@ -61,8 +61,14 @@ class PolyBlock(Block): # Something we can create and manipulate
         R = np.array([[np.cos(theta),-np.sin(theta)],
                       [np.sin(theta),np.cos(theta)]])
         self.vertices= np.dot(self.V,R).astype('int64')
+        assert self.vertices.ndim == 2
+        
+    @property
+    def matching_angles(self):
+        return (self.angles_of_symmetry + self.angle) % 360
                
 class Rect(PolyBlock):
+    angles_of_symmetry = np.linspace(0,360,5)[:-1]
     def __init__(self, color, center, size, typ, angle = 0.0, **kwargs):
         PolyBlock.__init__(self, color, center, size, typ, angle)
         third= self.size/3
@@ -70,9 +76,10 @@ class Rect(PolyBlock):
         
         self.rotate(self.angle)        
         
-        self.matching_angles = (np.linspace(0,360,5)[:-1] + self.angle) % 360        
+        #self.matching_angles = (self.angles_of_symmetry + self.angle) % 360        
         
 class Tri(PolyBlock):
+    angles_of_symmetry = np.linspace(0,360,4)[:-1]
     def __init__(self, color, center, size, typ, angle = 0.0, **kwargs):
         """
         size = (length,)
@@ -87,9 +94,9 @@ class Tri(PolyBlock):
         
         self.rotate(self.angle)        
         
-        self.matching_angles = (np.linspace(0,360,4)[:-1] + self.angle) % 360
                 
 class Hexagon(PolyBlock):
+    angles_of_symmetry = np.linspace(0,360,7)[:-1]    
     def __init__(self, color, center, size, typ, angle = 0.0, **kwargs):
         PolyBlock.__init__(self, color, center, size, typ, angle)
         third= self.size/3
@@ -100,11 +107,11 @@ class Hexagon(PolyBlock):
                                  [np.sin(x),np.cos(x)]])
         self.vertices= self.V = np.row_stack([np.dot(u,R(theta)) for theta in thetas])
         
-        self.rotate(angle)        
-        
-        self.matching_angles = (np.linspace(0,360,7)[:-1] + self.angle) % 360
-                
+        self.rotate(angle)
+
+                        
 class RightTri(PolyBlock):
+    angles_of_symmetry = np.array([0])
     def __init__(self, color, center, size, typ, angle = 0.0, **kwargs):
         PolyBlock.__init__(self, color, center, size, typ, angle)
         
@@ -112,11 +119,11 @@ class RightTri(PolyBlock):
         v -= v.mean(axis=0)
         self.vertices = self.V = v
         
-        self.rotate(angle)        
+        self.rotate(angle)
         
-        self.matching_angles = np.array([self.angle])
               
-class Trapezoid(PolyBlock):  
+class Trapezoid(PolyBlock):
+    angles_of_symmetry = np.array([0])    
     def __init__(self, color, center, size, typ, angle = 0.0, **kwargs):
         PolyBlock.__init__(self, color, center, size, typ, angle)
         half = size/2
@@ -127,10 +134,8 @@ class Trapezoid(PolyBlock):
         v -= v.mean(axis=0)
         self.vertices = self.V = v
         
-        self.rotate(angle)        
-        
-        self.matching_angles = np.array([self.angle])
-                
+        self.rotate(angle)
+                        
 # more shapes ...
 
 class Star(PolyBlock):

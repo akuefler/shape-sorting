@@ -1,121 +1,163 @@
-from game_settings import *
-
-from shapesorting import *
-from sandbox.util import Saver
-
 import argparse
 import numpy as np
-import sklearn as sk
-import sklearn.metrics as mets
 
-import sklearn.linear_model
+import sklearn
+from sklearn.decomposition import PCA
+import sklearn.svm
 import sklearn.lda
-import sklearn.naive_bayes
-import sklearn.tree
+import sklearn.linear_model
 
-import h5py
-
-from sklearn.svm import LinearSVC
+import sklearn.metrics as mets
 
 import matplotlib.pyplot as plt
 
-parser = argparse.ArgumentParser()
-#parser.add_argument('--encoding_time',type=str,default='16-11-11-07-18PM')
-#parser.add_argument('--encoding_time',type=str,default='16-12-03-09-40PM')
-parser.add_argument('--encoding_time',type=str,default='0')
+from config import DATADIR
 
-parser.add_argument('--classification',type=bool,default=False)
-parser.add_argument('--similarity',type=bool,default=False)
-parser.add_argument('--class_vis',type=bool,default=False)
-#parser.add_argument('--encoding',type=str)
+from util import Saver
+
+import tqdm
+
+parser = argparse.ArgumentParser()
+
+## includes holes
+#parser.add_argument("--data_time",type=str,default="17-01-19-07-59PM") # no grab
+#parser.add_argument("--data_time",type=str,default="17-01-19-09-27PM") # grab 1
+#parser.add_argument("--data_time",type=str,default="17-01-19-09-29PM") # grab 2
+
+#parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-19-07-59PM",
+                                                                  #"17-01-19-09-27PM",
+                                                                  #"17-01-19-09-29PM"])
+
+## no holes
+#parser.add_argument("--data_time",type=str,default="17-01-19-09-35PM") # no grab
+#parser.add_argument("--data_time",type=str,default="17-01-19-09-36PM") # grab 1
+#parser.add_argument("--data_time",type=str,default="17-01-19-09-37PM") # grab 2
+
+#parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-19-09-35PM",
+                                    #"17-01-19-09-36PM",
+                                    #"17-01-19-09-37PM"])
+
+# Fixed Position
+#parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-19-22-34-07-174659",
+                                    #"17-01-19-22-34-56-056347",
+                                    #"17-01-19-22-35-45-287050"])
+
+## Fixed Position, No Holes
+#parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-19-22-36-33-368248",
+                                    #"17-01-19-22-37-16-244572",
+                                    #"17-01-19-22-37-58-907670"])
+                                    
+## Holes, Enumerated
+#parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-20-21-12-51-477494",
+                                    #"17-01-20-21-13-10-048480",
+                                    #"17-01-20-21-13-35-095721"])
+
+## No Holes, Enumerated
+#parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-20-21-55-33-448895",
+                                    #"17-01-20-21-56-02-187089",
+                                    #"17-01-20-21-56-21-432451"])
+                                    
+### No Holes, Enumerated
+#parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-20-22-42-10-413497",
+                                    #"17-01-20-22-42-48-884555",
+                                    #"17-01-20-22-43-27-180222"])
+                                    
+### 81,000, holes, enumerated
+parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-20-23-17-53-444875",
+                                    "17-01-20-23-26-23-488455",
+                                    "17-01-20-23-33-47-043926"])
+
+
+parser.add_argument("--encodings",nargs="+",type=str,default=["Z_l1_flat","Z_l2_flat","Z_l3_flat","Z_value_hid","Z_adv_hid"])
+
+parser.add_argument("--cutoff",type=float,default=0.25)
+parser.add_argument("--n_features",type=int,default=200)
+parser.add_argument("--feat_ix",type=int,default=0)
+parser.add_argument("--dim_reduce",type=int,default=1)
+parser.add_argument("--normalize",type=int,default=1)
+
+parser.add_argument("--models",type=str,nargs="+",default=["softmax","svm","lda"])
+
 args = parser.parse_args()
 
-encoding_saver = Saver(time=args.encoding_time,path='{}/{}'.format(DATADIR,'enco_simi_data'))
+disc_saver = Saver(path='{}/{}'.format(DATADIR,'disc_results'))
+data_savers = [Saver(time=data_time,path='{}/{}'.format(DATADIR,'scene_and_enco_data'))
+               for data_time in args.data_times]
 
-simi_data = encoding_saver.load_dictionary(0,'simi_data')
-Y = simi_data['Y']
-X1 = simi_data['X1']
-SHAPES1 = simi_data['SHAPES1']
+_models = {'softmax':sklearn.linear_model.LogisticRegression(multi_class='multinomial',solver='sag'),
+          'svm':sklearn.svm.LinearSVC(dual=False, C=0.1),
+          'lda':sklearn.lda.LDA()}
+models = [(name, classif) for name, classif in _models.iteritems() if name in args.models]
 
-#Y = encoding_saver.load_value(0,'Y')
-#D = encoding_saver.load_dictionary(0, 'l3_flat_encodings') # more overfitting, more validation accuracy
-#D = encoding_saver.load_dictionary(0, 'l2_flat_encodings') 
-#D = encoding_saver.load_dictionary(0, 'adv_hid_encodings')
+MT = np.zeros((len(data_savers), len(args.encodings), len(models)))
+MV = np.zeros((len(data_savers), len(args.encodings), len(models)))
 
-#print("#####################")
-#print("ENCODING IS: {}".format(args.encoding))
+# weight matrix for each classifer
+n_class = 5
+W = np.zeros((len(data_savers), len(args.encodings), len(models)) + (n_class, args.n_features,))
+B = np.zeros((len(data_savers), len(args.encodings), len(models)) + (n_class,))
 
-if args.classification:
-    models = [('softmax',sk.linear_model.LogisticRegression(multi_class='multinomial',solver='sag')),
-              ('svm',LinearSVC(dual=False, C=0.1)),
-              ('lda',sklearn.lda.LDA())]
+c = 0
+C = len(data_savers) * len(args.encodings) * len(models)
+for i, data_saver in enumerate(data_savers):
+
+    data = data_saver.load_dictionary(0,"data")
     
-    #models = [sk.linear_model.LogisticRegression(), sk.svm.SVC(), sklearn.lda.LDA(),
-              #sklearn.naive_bayes.GaussianNB(), sklearn.tree.DecisionTreeClassifier()]
-              
-    keys = ['adv_hid_encodings','value_hid_encodings',
-            'l3_flat_encodings','l2_flat_encodings','l1_flat_encodings']
-    #keys = ['adv_hid_encodings','value_hid_encodings']    
-    
-    MT = np.zeros((len(keys),len(models)))
-    MV = np.zeros((len(keys),len(models)))
-    for i, encoding in enumerate(keys):
-        D = encoding_saver.load_dictionary(0, encoding)
-        X = D['rZ1']
-        N = X.shape[0]
-        cutoff = int(0.8 * N)
-        
-        X_t = X[:cutoff]
-        Y_t = SHAPES1[:cutoff]
-        X_v = X[cutoff:]
-        Y_v = SHAPES1[cutoff:]    
-        
-        for j, (model_name, model) in enumerate(models):
-            
-            #for i in range(O_t.shape[0]):
-                #plt.imshow(O_t[i])
-                #print SHAPESORT_ARGS1['shapes'][Y_t[i]]
-                #plt.show()
-            
-            model.fit(X_t,Y_t)
-            
-            print(model_name)
-            print("Encoding: {}".format(encoding))
-            acc_t = mets.accuracy_score(Y_t, model.predict(X_t))
-            print "train: {}".format(acc_t)
-            acc_v = mets.accuracy_score(Y_v, model.predict(X_v))
-            print "valid: {}".format(acc_v)
-            
-            MT[i,j], MV[i,j] = acc_t, acc_v
-            
-with h5py.File("{}.h5".format(args.encoding_time),"a") as hf:
-    hf.create_dataset("train",data=MT)
-    hf.create_dataset("valid",data=MV)
-
-if args.similarity:
-    models = [sk.linear_model.LogisticRegression(), sk.svm.SVC(), sklearn.lda.LDA(),
-              sklearn.naive_bayes.GaussianNB(), sklearn.tree.DecisionTreeClassifier()]
-    
-    for merge in [lambda x, y : np.column_stack((x,y)), lambda x, y : x * y]:
-        
-        X = merge(D['rZ1'],D['rZ2'])
+    # extract dataset information
+    if i == 0:
+        X = data["X"]
         N = X.shape[0]
         p = np.random.permutation(N)
+        cutoff = int(args.cutoff * len(p))
         
-        X = X[p]
-        Y = Y[p]
-        cutoff = int(0.7 * N)
+        p_t = p[:cutoff]
+        p_v = p[cutoff:]    
+    
+    blocks = data_saver.load_recursive_dictionary("blocks")
+    BLOCK_SHAPE = np.concatenate([np.array(blocks['{:0{}}'.format(itr,len(str(N)))]['shape']) for itr in range(N)])
+    
+    for j, layer in enumerate(args.encodings):
+        # create training and validation sets
+        Z_t = data[layer][p_t]
+        y_t = BLOCK_SHAPE[p_t]
         
-        X_t = X[:cutoff]
-        Y_t = Y[:cutoff]
-        X_v = X[cutoff:]
-        Y_v = Y[cutoff:]    
+        Z_v = data[layer][p_v]
+        y_v = BLOCK_SHAPE[p_v]
         
-        for model in models:
-            print str(type(model))
-            model.fit(X_t, Y_t)
-            
-            print mets.accuracy_score(Y_t, model.predict(X_t))
-            print mets.accuracy_score(Y_v, model.predict(X_v))
+        if args.normalize:
+            Z_t_mean = Z_t.mean(axis=0)
+            Z_t_stdv = Z_t.std(axis=0) + 1e-6
+            Z_t -= Z_t_mean
+            Z_t /= Z_t_stdv
+            Z_v -= Z_t_mean
+            Z_v /= Z_t_stdv
 
-halt= True
+        pca = PCA() 
+        if args.dim_reduce:
+            G_t = pca.fit_transform(Z_t)[:,args.feat_ix:args.feat_ix+args.n_features]
+            G_v = pca.transform(Z_v)[:,args.feat_ix:args.feat_ix+args.n_features]
+        else:
+            G_t = Z_t
+            G_v = Z_v
+            
+        assert G_t.shape[-1] == args.n_features
+        
+        for k, (model_name, model) in enumerate(models):
+            #print(model_name)
+            model.fit(G_t,y_t)
+            #print("Encoding: {}".format(layer))
+            acc_t = mets.accuracy_score(y_t, model.predict(G_t))
+            #print "train: {}".format(acc_t)
+            acc_v = mets.accuracy_score(y_v, model.predict(G_v))
+            #print "valid: {}".format(acc_v)
+        
+            MT[i,j,k], MV[i,j,k] = acc_t, acc_v
+            W[i,j,k] = model.coef_
+            B[i,j,k] = model.intercept_
+            
+            c+= 1
+            if c % 5 == 0:
+                print("{} of {}...".format(c,C))
+            
+disc_saver.save_dict(0, {"MT":MT, "MV":MV, "W":W, "B":B, "N":N, "p":p}, name="data")
+disc_saver.save_args(args)
