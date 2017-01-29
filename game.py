@@ -278,8 +278,9 @@ class ShapeSorter(object):
         if 'rotate_cw' in agent_events or 'rotate_ccw' in agent_events and self.state['target'] == None:
             self.extra_rot += 1
             
-        if self.after_grab:
-            self.actions_after_grab.append(act_category)
+        if self.experiment == "one_block":
+            if self.after_grab:
+                self.actions_after_grab.append(act_category)
         
         #Penalize border hugging:
         if cursorPos[1] == self.W - 0.1*self.W or cursorPos[1] == self.W*0.1 or \
@@ -303,8 +304,9 @@ class ShapeSorter(object):
                         self.state['target']=block # "pick up" block
                         self.state['bList'].append(self.state['bList'].pop(self.state['bList'].index(block)))
                         
-                        if self.experiment == "one_block" and not self.after_grab:
-                            self.after_grab = True
+                        if self.experiment == "one_block":
+                            if not self.after_grab:
+                                self.after_grab = True
                         
             if self.state['target'] is not None:
                 if self.experiment == "one_block":
