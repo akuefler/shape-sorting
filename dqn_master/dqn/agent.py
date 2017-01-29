@@ -458,7 +458,8 @@ class Agent(BaseModel):
     winners, losers = [], []
     steps_min, steps_taken = [], []
     
-    CMAT = np.zeros((len(self.env.shapes),len(self.env.shapes)))
+    victors = np.zeros((len(self.env.shapes),len(self.env.shapes)))
+    totals = np.zeros_like(victors)
     actions_after_grab = []
     for idx in tqdm(range(n_episode), ncols=70):
       screen = self.env.reset()
@@ -482,7 +483,9 @@ class Agent(BaseModel):
           winners.append(info['winner'])          
           if experiment == "preference":
             losers.append(info['loser'])
-            CMAT[info['winner'],info['loser']] += 1
+            victors[info['loser'],info['winner']] += 1
+            totals[info['winner'],info['loser']] += 1
+            totals[info['loser'],info['winner']] += 1
           if experiment == "one_block":
             steps_min.append(info['n_steps_min'])
             steps_taken.append(info['n_steps'])
@@ -491,14 +494,15 @@ class Agent(BaseModel):
 
     #import pdb; pdb.set_trace()
     if experiment == "preference":
+      pref_saver = Saver(path='{}/{}'.format(data_dir,'pref_results'))
       print("Winners: ")
       print(Counter(winners))
       print("Losers: ")
       print(Counter(losers))
       
-      with h5py.File("preference_mat.h5","a") as hf:
-        hf.create_dataset("C",data=CMAT)      
-      
+      D = {"totals":totals,
+           "victors":victors}
+      pref_saver.save_dict(0, D, name="data")
     if experiment == "one_block":
       stats = np.column_stack([np.array(winners),
                               np.array(steps_min),
