@@ -1,84 +1,80 @@
-from matplotlib import gridspec
+from util import Saver
+from config import *
+
+from plotting import *
 
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
 import h5py
+import argparse
 
 matplotlib.rcParams.update({'font.size': 22})
 
-with h5py.File("preference_mat.h5","r") as hf:
-    X_ = hf['C'][...]
+parser = argparse.ArgumentParser()
+parser.add_argument("--data_time",type=str,default="17-01-28-19-07-13-805742")
 
-ylabel = "Winner"
-xlabel = "Loser"
-if True:
-    X_ = X_.T
-    temp = xlabel
-    xlabel = ylabel
-    ylabel = temp
-    
-x_ = X_.sum(axis=0)
-x_argsort = x_.argsort()[::-1]
+args = parser.parse_args()
 
-if True:
-    X_ = (X_.T / X_.sum(axis=1)).T
+data_saver = Saver(time=args.data_time, path='{}/{}'.format(DATADIR,'pref_results'))
+data = data_saver.load_dictionary(0,"data")
 
+ylabel = "Loser"
+xlabel = "Winner"
+X = np.nan_to_num(data['victors'] / data['totals'])
+x = data['victors'].sum(axis=0) / data['totals'].sum(axis=0)
+
+x_argsort = range(5)
 if True:
-    X = np.zeros_like(X_)
-    for i in range(X.shape[0]):
-        for j in range(X.shape[1]):
-            i_ = x_argsort[i]
-            j_ = x_argsort[j]
-            X[i,j] = X_[i_,j_]
-            
-    x = x_[x_argsort]
-else:
-    x_argsort = np.array(range(5))
-    x = x_
-    X = X_
+    X, x_argsort = argsort_matrix(X, x_argsort=np.argsort(x)[::-1])
+    x = x[x_argsort]
 
 ##
 from matplotlib.ticker import NullFormatter
 nullfmt = NullFormatter()         # no labels
 
 # definitions for the axes
-labels = np.array(["Trap.","R. Tri.","Hex.","E. Tri.","Square"])
-hw = 0.65
+hw = 0.4
 
-left, width = 0.2, hw
+left, width = 0.3, hw
 bottom, height = 0.1, hw
 bottom_h = left_h = bottom + hw
 
 rect_scatter = [left, bottom, width, height]
-rect_histx = [left, bottom_h, width, 0.2]
-fsize = 10
-plt.figure(1, figsize=(fsize, fsize))
+rect_histx = [left, bottom_h, width, hw]
+fsize = 15
+f = plt.figure(1, figsize=(fsize, fsize))
 
-axScatter = plt.axes(rect_scatter)
+axMat = plt.axes(rect_scatter)
 axHistx = plt.axes(rect_histx)
 
 # no labels
 axHistx.xaxis.set_major_formatter(nullfmt)
-axScatter.matshow(X,cmap="Greys")
+#axScatter.matshow(X,cmap="Greys")
+plot_matrix_helper(X, xlabel, axMat, thresh = 0.5, plot_zeros = False)
 
-axScatter.xaxis.tick_bottom()
-axScatter.set_xticklabels([""] + list(labels[x_argsort]))
-axScatter.set_yticklabels([""] + list(labels[x_argsort]))
+axMat.xaxis.tick_bottom()
+axMat.set_xticklabels([""] + list(LABELS[x_argsort]))
+axMat.set_yticklabels([""] + list(LABELS[x_argsort]))
 
-axScatter.set_xlabel(xlabel, fontsize=28)
-axScatter.set_ylabel(ylabel, fontsize=28)
+axMat.set_xlabel(xlabel, fontsize=28)
+axMat.set_ylabel(ylabel, fontsize=28)
 
 binwidth = 1
 
-lim0, lim1 = axScatter.get_xlim()
+lim0, lim1 = axMat.get_xlim()
 
 bins = np.arange(lim0, lim1 + binwidth, binwidth)
 
-axHistx.bar(range(len(x)),x, width=1.0, facecolor="white", edgecolor='black', linewidth=5)
-axHistx.set_ylim((axHistx.get_ylim()[0],axHistx.get_ylim()[1] + 5))
+axHistx.bar(range(len(x)),x, width=1.0, facecolor="white",edgecolor="black", linewidth=5)
+#axHistx.set_ylim((axHistx.get_ylim()[0],axHistx.get_ylim()[1] + 5))
+axHistx.set_ylim(0,1)
 
-plt.show()
+axHistx.grid(b=True, which='major')
+axHistx.grid(b=True, which='minor')
+
+#plt.show()
+plt.savefig("{}pref_mat.png".format(FIGDIR),bbox_inches='tight')
 
 halt= True

@@ -1,9 +1,10 @@
 import argparse
 import numpy as np
 
+import matplotlib
 import matplotlib.pyplot as plt
 
-from config import DATADIR
+from config import *
 
 from util import Saver
 
@@ -18,7 +19,7 @@ parser.add_argument("--normalize",type=int,default=1)
 
 parser.add_argument("--plot_by_action",type=int,default=0)
 
-parser.add_argument("--bar_width",type=float,default=0.25)
+parser.add_argument("--bar_width",type=float,default=0.3)
 parser.add_argument("--legend_size",type=float,default=25.)
 
 args = parser.parse_args()
@@ -27,6 +28,8 @@ data_saver = Saver(time=args.data_time, path='{}/{}'.format(DATADIR,'one_block_r
 
 actions_after_grab = data_saver.load_recursive_dictionary("actions_after_grab")["actions_after_grab"]
 stats = data_saver.load_dictionary(0,"stats")["stats"]
+
+matplotlib.rcParams.update({'font.size': 22})
 
 afg = [np.array(x) for x in actions_after_grab.values()]
 
@@ -69,16 +72,20 @@ if n_axes == 1:
     ax = np.array([ax])
 for i, M_shape in enumerate(M):
     artists = []
-    for j, color in enumerate(['r','g','b']):
-        artist = ax[i].bar(ind + j * args.bar_width, M_shape[j], args.bar_width, color=color)
+    for j, color in enumerate([(.5,1.,.5),(1,.5,.5),(.5,.5,1)]):
+        artist = ax[i].bar(ind + j * args.bar_width, M_shape[j], args.bar_width, color=color,
+                           linewidth=3)
         artists.append(artist[0])
         
     ax[i].set_ylim(0,ylim)
     ax[i].legend(tuple(artists), ("Grab","Move","Rotate"), fontsize= args.legend_size)
         
-        
-# plot "optimality"
+    ax[i].set_xticks(range(5))
+    ax[i].grid(b=True, which='major')
     
-plt.show()
+    ax[i].set_xlabel("Trajectory Segment", fontsize=22, fontweight="bold")
+    ax[i].set_ylabel("Action Distribution", fontsize=22, fontweight="bold")    
+
+plt.savefig("{}strategy.png".format(FIGDIR),bbox_inches='tight')
 
 halt= True
