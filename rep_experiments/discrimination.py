@@ -64,8 +64,8 @@ parser = argparse.ArgumentParser()
                                     
 ### 81,000, holes, enumerated
 parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-20-23-17-53-444875",
-                                    "17-01-20-23-26-23-488455",
-                                    "17-01-20-23-33-47-043926"])
+                                    "17-01-20-23-26-23-488455"]),
+                                    #"17-01-20-23-33-47-043926"])
 
 
 parser.add_argument("--encodings",nargs="+",type=str,default=["Z_l1_flat","Z_l2_flat","Z_l3_flat","Z_value_hid","Z_adv_hid"])
@@ -89,13 +89,18 @@ _models = {'softmax':sklearn.linear_model.LogisticRegression(multi_class='multin
           'lda':sklearn.lda.LDA()}
 models = [(name, classif) for name, classif in _models.iteritems() if name in args.models]
 
-MT = np.zeros((len(data_savers), len(args.encodings), len(models)))
-MV = np.zeros((len(data_savers), len(args.encodings), len(models)))
-
 # weight matrix for each classifer
 n_class = 5
 W = np.zeros((len(data_savers), len(args.encodings), len(models)) + (n_class, args.n_features,))
 B = np.zeros((len(data_savers), len(args.encodings), len(models)) + (n_class,))
+
+# classifier accuracy
+MT = np.zeros((len(data_savers), len(args.encodings), len(models)))
+MV = np.zeros((len(data_savers), len(args.encodings), len(models)))
+
+# classifier confusion
+CT = np.zeros((len(data_savers), len(args.encodings), len(models), n_class, n_class))
+CV = np.zeros((len(data_savers), len(args.encodings), len(models), n_class, n_class))
 
 c = 0
 C = len(data_savers) * len(args.encodings) * len(models)
@@ -147,11 +152,13 @@ for i, data_saver in enumerate(data_savers):
             model.fit(G_t,y_t)
             #print("Encoding: {}".format(layer))
             acc_t = mets.accuracy_score(y_t, model.predict(G_t))
+            cm_t = mets.confusion_matrix(y_t, model.predict(G_t), labels=range(n_class))
             #print "train: {}".format(acc_t)
             acc_v = mets.accuracy_score(y_v, model.predict(G_v))
-            #print "valid: {}".format(acc_v)
-        
+            cm_v = mets.confusion_matrix(y_v, model.predict(G_v), labels=range(n_class))
+
             MT[i,j,k], MV[i,j,k] = acc_t, acc_v
+            CT[i,j,k], CV[i,j,k] = cm_t, cm_v
             W[i,j,k] = model.coef_
             B[i,j,k] = model.intercept_
             
@@ -159,5 +166,6 @@ for i, data_saver in enumerate(data_savers):
             if c % 5 == 0:
                 print("{} of {}...".format(c,C))
             
-disc_saver.save_dict(0, {"MT":MT, "MV":MV, "W":W, "B":B, "N":N, "p":p}, name="data")
+disc_saver.save_dict(0, {"MT":MT, "CT":CT, "MV":MV, "CV":CV,
+                         "W":W, "B":B, "N":N, "p":p}, name="data")
 disc_saver.save_args(args)
