@@ -4,6 +4,7 @@ import collections
 import itertools
 
 LABELS = np.array(["Trap.","R. Tri.","Hex.","E. Tri.","Square"])
+SHAPE_ORDER = np.array([2, 3, 0, 4, 1])
 
 def argsort_matrix(X_,x_argsort=None):
     x_ = np.diag(X_)
@@ -20,6 +21,7 @@ def argsort_matrix(X_,x_argsort=None):
     return X, x_argsort
 
 def plot_matrix_helper(X,labels,ax,normalize=False,plot_zeros=True,k=0,thresh=0.6,cmap=plt.cm.Reds):
+    labels = [None] + list(labels)    
     ax.imshow(X, interpolation='nearest', cmap=cmap)
             #if name is not None:
                 #ax.set_title(name)    

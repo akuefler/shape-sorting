@@ -13,7 +13,7 @@ import argparse
 matplotlib.rcParams.update({'font.size': 22})
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--data_time",type=str,default="17-01-28-19-07-13-805742")
+parser.add_argument("--data_time",type=str,default="17-01-30-22-03-52-279284")
 
 args = parser.parse_args()
 
@@ -75,6 +75,6 @@ axHistx.grid(b=True, which='major')
 axHistx.grid(b=True, which='minor')
 
 #plt.show()
-plt.savefig("{}pref_mat.png".format(FIGDIR),bbox_inches='tight')
+plt.savefig("{}pref_mat.pdf".format(FIGDIR),bbox_inches='tight',format='pdf',dpi=300)
 
 halt= True

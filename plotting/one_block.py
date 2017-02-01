@@ -5,6 +5,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 from config import *
+from plotting import *
 
 from util import Saver
 
@@ -12,7 +13,7 @@ import tqdm
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--data_time",type=str,default="17-01-22-16-00-14-471258")
+parser.add_argument("--data_time",type=str,default="17-01-30-21-13-16-702347")
 
 parser.add_argument("--n_segments",type=int,default=4)
 parser.add_argument("--normalize",type=int,default=1)
@@ -32,6 +33,12 @@ stats = data_saver.load_dictionary(0,"stats")["stats"]
 matplotlib.rcParams.update({'font.size': 22})
 
 afg = [np.array(x) for x in actions_after_grab.values()]
+# remove wrong fits
+print("{} wrong fits".format(stats[:,-1].sum()))
+print("{} ave. wrong fits".format(stats[:,-1].mean()))
+
+stats = stats[stats[:,-1] == 0]
+stats = stats[:,:-1]
 
 # action x segment
 if args.plot_by_action:
@@ -86,6 +93,29 @@ for i, M_shape in enumerate(M):
     ax[i].set_xlabel("Trajectory Segment", fontsize=22, fontweight="bold")
     ax[i].set_ylabel("Action Distribution", fontsize=22, fontweight="bold")    
 
-plt.savefig("{}strategy.png".format(FIGDIR),bbox_inches='tight')
+plt.savefig("{}strategy.pdf".format(FIGDIR),bbox_inches='tight',format='pdf',dpi=300)
+
+names = np.array(["Trap.", "R. Tri", "Hex.", "E. Tri", "Square"])
+
+l = []
+for i in range(5):
+    x = stats[stats[:,0] == i][:,1:]
+    d = {"name":names[i], "mean":x.mean(axis=0), "median":np.median(x,axis=0), "std":x.std(axis=0)}
+    l.append(
+        d
+    )
+    
+print("Shape & Min. Steps &  Act. Steps & Ratio \\\\")
+print("\hline")
+for i in SHAPE_ORDER:
+    ll = l[i]
+    min_steps_mu = ll['mean'][0]
+    steps_taken_mu = ll['mean'][1]
+    min_steps_std = ll['std'][0]
+    steps_taken_std = ll['std'][1]    
+    print("{} & {:.2f} \pm ({:.1f}) & {:.2f} \pm ({:.1f}) & {:.2f} \\\\".format(ll['name'], min_steps_mu, min_steps_std,
+                                                             steps_taken_mu, steps_taken_std,
+                                                             min_steps_mu/steps_taken_mu,
+                                                             ))
 
 halt= True
