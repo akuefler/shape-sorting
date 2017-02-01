@@ -46,7 +46,6 @@ parser = argparse.ArgumentParser()
 #parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-19-22-36-33-368248",
                                     #"17-01-19-22-37-16-244572",
                                     #"17-01-19-22-37-58-907670"])
-                                    
 ## Holes, Enumerated
 #parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-20-21-12-51-477494",
                                     #"17-01-20-21-13-10-048480",
@@ -63,10 +62,14 @@ parser = argparse.ArgumentParser()
                                     #"17-01-20-22-43-27-180222"])
                                     
 ### 81,000, holes, enumerated
-parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-20-23-17-53-444875",
-                                    "17-01-20-23-26-23-488455"]),
-                                    #"17-01-20-23-33-47-043926"])
+#parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-20-23-17-53-444875",
+                                    #"17-01-20-23-26-23-488455"]),
+                                    ##"17-01-20-23-33-47-043926"])
 
+### 81,000, holes, enumerated # RANDOM NETWORK
+parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-29-14-21-59-644400",
+                                    "17-01-29-14-30-54-397244"])
+                                    #"17-01-20-23-33-47-043926"])
 
 parser.add_argument("--encodings",nargs="+",type=str,default=["Z_l1_flat","Z_l2_flat","Z_l3_flat","Z_value_hid","Z_adv_hid"])
 
