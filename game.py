@@ -6,6 +6,10 @@ from scipy.misc import imresize
 from scipy.stats import entropy
 import matplotlib as mpl
 
+import h5py
+
+from config import *
+
 import sys
 import gym
 from gym.spaces import Discrete, Box
@@ -33,7 +37,12 @@ def manhattan_distance(x,y):
 
 def angular_distance(x,matches,theta):
     return np.min([np.abs((x - h_ang + 180) % 360 - 180) for h_ang in matches if h_ang % theta == 0])
-        
+    
+def wrong_hole(hole, block):
+    pos_fit = np.linalg.norm(np.array(hole.center) - np.array(block.center)) < 10
+    geom_fit = type(hole) is not type(block)
+    return pos_fit and geom_fit
+
 def fit(hole, block):
     """
     determine if block fits in hole.
@@ -203,7 +212,7 @@ class ShapeSorter(object):
             elif self.act_mode == 'continuous':
                 raise NotImplementedError
         else:
-            raise NotImplementedError
+            agent_events = action
         
         if self.grab_mode != 'toggle':
             if 'grab' in agent_events:
@@ -336,6 +345,13 @@ class ShapeSorter(object):
                         info['winner'] = self.shapes.index(type(hole))
                         if self.experiment == 'preference':
                             info['loser'] = self.shapes.index(type(self.state['bList'][0]))
+                        elif self.experiment == 'one_block':
+                            info['wrong_fit'] = 0
+                elif wrong_hole(hole, self.state['target']) and self.experiment == "one_block":
+                    done = True
+                    info['winner'] = self.shapes.index(type(self.state['target']))
+                    #info['loser'] = self.shapes.index(type(hole))
+                    info['wrong_fit'] = 1
                         
             self.state['target'] = None
             
@@ -353,20 +369,20 @@ class ShapeSorter(object):
         if self.state['bList'] == []:
             done= True
             reward+= REWARD_DICT['trial_end'] / self.n_blocks
-            if self.experiment == "one_block":
-                mandist = manhattan_distance(self.init_geom['c_cen'],self.init_geom['b_cen']) + \
-                    manhattan_distance(self.init_geom['b_cen'],self.init_geom['h_cen'])
-                angdist = angular_distance(self.init_geom["b_ang"],self.init_geom["h_angs"],self.rot_size)
-                                
-                info["n_steps"] = self.n_steps
-                info["n_steps_min"] = mandist/self.step_size + angdist/self.rot_size + 2 - 1
-                
-                diff = self.n_steps - info["n_steps_min"]                
-                
-                info["extra_trans"] = diff - self.extra_rot
-                info["extra_rot"] = self.extra_rot
-                
-                info["actions_after_grab"] = self.actions_after_grab
+        if self.experiment == "one_block":
+            mandist = manhattan_distance(self.init_geom['c_cen'],self.init_geom['b_cen']) + \
+                manhattan_distance(self.init_geom['b_cen'],self.init_geom['h_cen'])
+            angdist = angular_distance(self.init_geom["b_ang"],self.init_geom["h_angs"],self.rot_size)
+                            
+            info["n_steps"] = self.n_steps
+            info["n_steps_min"] = mandist/self.step_size + angdist/self.rot_size + 2 - 1
+            
+            diff = self.n_steps - info["n_steps_min"]                
+            
+            info["extra_trans"] = diff - self.extra_rot
+            info["extra_rot"] = self.extra_rot
+            
+            info["actions_after_grab"] = self.actions_after_grab
                 
                 #if diff != 0:
                     #halt= True
@@ -427,7 +443,11 @@ def main(smooth= False, **kwargs):
                             actions.append('rotate_ccw')
                         elif event.key == pg.K_d:
                             actions.append('rotate_cw')
-                            
+                        elif event.key == pg.K_s:
+                            with h5py.File("./plotting/screenshots.h5","a") as hf:
+                                img = pg.surfarray.pixels3d(ss.screen)
+                                hf.create_dataset("{}".format(np.random.randint(10)),data=img)
+
                     if event.type == pg.KEYUP and smooth:
                         if event.key == pg.K_SPACE:
                             actions.remove('grab')
@@ -440,7 +460,7 @@ def main(smooth= False, **kwargs):
                         elif event.key == pg.K_UP:
                             actions.remove('up')
                         elif event.key == pg.K_DOWN:
-                            actions.remove('down')                
+                            actions.remove('down')
               
             if actions == []:
                 actions.append('none')
@@ -458,4 +478,4 @@ def main(smooth= False, **kwargs):
 if __name__ == '__main__':
     h = Hexagon(RED, (0.,0.), 30, 'block', angle = 0.0)
     from game_settings import SHAPESORT_ARGS0, SHAPESORT_ARGS1, SHAPESORT_ARGS2
-    X = main(smooth= False, **SHAPESORT_ARGS2) # Execute our main function
+    X = main(smooth= False, **SHAPESORT_ARGS1) # Execute our main function
