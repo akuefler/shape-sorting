@@ -13,17 +13,30 @@ import argparse
 matplotlib.rcParams.update({'font.size': 22})
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--data_time",type=str,default="17-01-30-22-03-52-279284")
+#parser.add_argument("--data_time",type=str,default="17-01-30-22-03-52-279284")
+#parser.add_argument("--data_time",type=str,default="17-04-22-12-10-45-653249")
+
+#parser.add_argument("--data_time",type=str,default="17-04-22-22-10-22-293106") # test_ep is 0.1
+parser.add_argument("--data_time",type=str,default="17-04-22-19-31-09-444847") # test_ep is 0.0
+parser.add_argument("--save",type=int,default=0)
 
 args = parser.parse_args()
 
 data_saver = Saver(time=args.data_time, path='{}/{}'.format(DATADIR,'pref_results'))
 data = data_saver.load_dictionary(0,"data")
+try:
+    exp_args = data_saver.load_dictionary(0,"args")
+except:
+    exp_args = None
+
+import pdb; pdb.set_trace()
 
 ylabel = "Loser"
 xlabel = "Winner"
 X = np.nan_to_num(data['victors'] / data['totals'])
 x = data['victors'].sum(axis=0) / data['totals'].sum(axis=0)
+
+import pdb; pdb.set_trace()
 
 x_argsort = range(5)
 if True:
@@ -62,7 +75,6 @@ axMat.set_xlabel(xlabel, fontsize=28)
 axMat.set_ylabel(ylabel, fontsize=28)
 
 binwidth = 1
-
 lim0, lim1 = axMat.get_xlim()
 
 bins = np.arange(lim0, lim1 + binwidth, binwidth)
@@ -74,7 +86,8 @@ axHistx.set_ylim(0,1)
 axHistx.grid(b=True, which='major')
 axHistx.grid(b=True, which='minor')
 
-#plt.show()
-plt.savefig("{}pref_mat.pdf".format(FIGDIR),bbox_inches='tight',format='pdf',dpi=300)
+if args.save:
+    plt.savefig("{}/pref_mat.pdf".format(FIGDIR),bbox_inches='tight',format='pdf',dpi=300)
+else:
+    plt.show()
 
-halt= True

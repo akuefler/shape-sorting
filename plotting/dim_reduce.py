@@ -63,6 +63,8 @@ parser.add_argument("--encodings",nargs="+",type=str,default=["Z_l1_flat","Z_l2_
 parser.add_argument("--N",type=int,default=1000)
 parser.add_argument("--model",type=str,default="pca")
 parser.add_argument("--color_fn",type=str,default="shape")
+parser.add_argument("--show",type=int,default=1)
+
 args = parser.parse_args()
 
 assert args.color_fn in ["shape","center","delta"]
@@ -125,6 +127,7 @@ for j, data_saver in enumerate(data_savers):
     models = {"pca":PCA(),"tsne":TSNE()}
     model = models[args.model]
     
+    np.random.seed(456)
     p = np.random.choice(range(NN),args.N,replace=False)
     print(len(p))
     for i, (layer, ax) in enumerate(zip(args.encodings,axs[j])):
@@ -143,7 +146,10 @@ for j, data_saver in enumerate(data_savers):
     
 #plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
 
-#plt.show()
-plt.tight_layout()        
-plt.savefig("{}pca.pdf".format(FIGDIR),bbox_inches='tight',format='pdf',dpi=300)
+if args.show:
+    plt.show()
+else:
+    plt.tight_layout()        
+    print("{}/pca.pdf".format(FIGDIR))
+    plt.savefig("{}/pca.pdf".format(FIGDIR),bbox_inches='tight',format='pdf',dpi=300)
 

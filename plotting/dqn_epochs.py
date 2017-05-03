@@ -30,10 +30,12 @@ while True:
         itr.append(
         s.split('/')[0].split('|')[-1]
         )
-    
-d_keys = [' avg_ep_r',' # game']
+
+#d_keys = [' avg_ep_r',' # game']
+d_keys = [' # game']
 titles = ["Average Return per Trial", "Number of Trials"]
 f, axs = plt.subplots(len(d_keys),1, figsize=(15,15))
+axs = [axs]
 
 for j, (d_key, ax) in enumerate(zip(d_keys,axs)):
     ax.set_xlim((0,1800))
@@ -50,7 +52,11 @@ for j, (d_key, ax) in enumerate(zip(d_keys,axs)):
     ax.grid(b=True, which='major')
     if j == len(d_keys) - 1:
         ax.set_xlabel("Epochs", fontweight="bold")
-        
+
 plt.tight_layout()
 
-plt.savefig("{}dqn_epochs.pdf".format(FIGDIR),bbox_inches='tight',format='pdf',dpi=300)
+if True:
+    plt.savefig("{}/dqn_epochs.pdf".format(FIGDIR),bbox_inches='tight',format='pdf',dpi=300)
+else:
+    plt.show()
+

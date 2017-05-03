@@ -29,7 +29,7 @@ for i in range(5):
     l.append(
         d
     )
-    
+
 print("Shape & Min. Steps &  Act. Steps & Ratio \\\\")
 print("\hline")
 for i in SHAPE_ORDER:
@@ -37,10 +37,10 @@ for i in SHAPE_ORDER:
     min_steps_mu = ll['mean'][0]
     steps_taken_mu = ll['mean'][1]
     min_steps_std = ll['std'][0]
-    steps_taken_std = ll['std'][1]    
+    steps_taken_std = ll['std'][1]
     print("{} & {:.2f} \pm ({:.1f}) & {:.2f} \pm ({:.1f}) & {:.2f} \\\\".format(ll['name'], min_steps_mu, min_steps_std,
                                                              steps_taken_mu, steps_taken_std,
                                                              min_steps_mu/steps_taken_mu,
                                                              ))
-    
+
 halt= True
