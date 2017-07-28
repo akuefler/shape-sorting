@@ -5,7 +5,7 @@ from game import ShapeSorter
 import numpy as np
 
 class ShapeSorterWrapper(ShapeSorter):
-    
+
     def __init__(self):
         super(ShapeSorterWrapper, self).__init__(
             act_mode=ShapeSorterWrapper.act_mode,
@@ -20,7 +20,7 @@ class ShapeSorterWrapper(ShapeSorter):
             act_map=ShapeSorterWrapper.act_map,
             reward_dict=ShapeSorterWrapper.reward_dict
         )
-    
+
     @classmethod
     def set_initials(cls, **kwargs):
         for k, v in kwargs.iteritems():
@@ -28,7 +28,7 @@ class ShapeSorterWrapper(ShapeSorter):
 
 ShapeSorterWrapper.set_initials(**SHAPESORT_ARGS1)
 
-def register_env():    
+def register_env():
     gym.envs.register(
         id= "ShapeSorter-v0",
         #entry_point='rltools.envs.julia_sim:FollowingWrapper',
@@ -36,7 +36,7 @@ def register_env():
         timestep_limit=15000,
         reward_threshold=15000,
     )
-    
+
     env = gym.make('ShapeSorter-v0')
     return env
 import os
@@ -46,7 +46,7 @@ import json
 import datetime
 import calendar
 
-class Saver(object):    
+class Saver(object):
     def __init__(self,path=None,overwrite= False,time=None):
         if time is None:
             now = datetime.datetime.now()
@@ -54,12 +54,12 @@ class Saver(object):
             self.time = calendar.datetime.datetime.now().strftime('%y-%m-%d-%H-%M-%S-%f')
         else:
             self.time = time
-        
+
         if path is None:
             path = config.LOG_DIR
         assert path[-1] != "/"
         self._path = path + "/" + self.time + "/"
-            
+
         #if not overwrite:
             #existing_names = os.listdir(path)
             #c = 0
@@ -69,18 +69,23 @@ class Saver(object):
             #os.mkdir(self._path)
         #else:
             #self._path += "/"
-        
+
     def save_args(self,args):
         #with h5py.File(self._path + "args.txt", 'a') as hf:
         self.dircheck()
         json.dump(vars(args), open(self._path + "args.txt",'a'))
-            
+
+    def load_args(self):
+        with open(self._path + "args.txt","r") as f:
+            d = eval(f.readlines()[0])
+        return d
+
     def save_dict(self,itr, d, name= ""):
         self.dircheck()
         with h5py.File(self._path + "epochs.h5", 'a') as hf:
             for key, value in d.iteritems():
                 hf.create_dataset("iter{itr:05}{name}/".format(itr=itr,name="/"+name)+key,data=value)
-                
+
     def save_recursive_dict(self, itr, d, name= ""):
         def recurse(f, p, x):
             for key, item in x.items():

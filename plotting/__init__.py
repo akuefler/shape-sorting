@@ -21,11 +21,13 @@ def argsort_matrix(X_,x_argsort=None):
     x = x_[x_argsort]
     return X, x_argsort
 
-def plot_matrix_helper(X,labels,ax,normalize=False,plot_zeros=True,k=0,thresh=0.6,cmap=plt.cm.Reds):
+def plot_matrix_helper(X,labels,ax,normalize=False,plot_diag=True,k=0,thresh=0.6,cmap=plt.cm.Reds):
     labels = [None] + list(labels)
     ax.imshow(X, interpolation='nearest', cmap=cmap)
             #if name is not None:
-                #ax.set_title(name)    
+                #ax.set_title(name)
+    if not plot_diag:
+        np.fill_diagonal(X,-np.float("inf"))
 
     if normalize:
         X = X.astype('float') / X.sum(axis=1)[:, np.newaxis]
@@ -35,16 +37,19 @@ def plot_matrix_helper(X,labels,ax,normalize=False,plot_zeros=True,k=0,thresh=0.
 
     thresh = thresh * X.max()
     for i, j in itertools.product(range(X.shape[0]), range(X.shape[1])):
-        if not plot_zeros and X[i,j] == 0:
-                continue
+        if not plot_diag and (i == j):
+            continue
+#        if not plot_zeros and X[i,j] == 0:
+#                continue
         ax.text(j, i, '{:.2f}'.format(X[i, j]),
                 horizontalalignment="center",
                 color="white" if X[i, j] > thresh else "black")
+#                color="black")
 
     ax.set_xticklabels(labels)
     if k == 0:
-        ax.set_ylabel('Ground Truth',fontweight='bold')
-        ax.set_xlabel('Prediction',fontweight='bold')
+        ax.set_ylabel('Ground Truth',fontweight='bold',fontsize=28)
+        ax.set_xlabel('Prediction',fontweight='bold',fontsize=28)
 
         ax.set_yticklabels(labels)
 

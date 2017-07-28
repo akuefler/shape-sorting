@@ -24,9 +24,11 @@ class Agent(BaseModel):
 
     self.env = environment
     self.env_type = config.env_type
-    
+
     self.history = History(self.config)
     self.memory = ReplayMemory(self.config, self.model_dir)
+
+    self.step = 0
 
     with tf.variable_scope('step'):
       self.step_op = tf.Variable(0, trainable=False, name='step')
@@ -47,7 +49,7 @@ class Agent(BaseModel):
     if self.env_type == 'shapesort':
       screen = self.env.reset()
     else:
-      screen, reward, action, terminal = self.env.new_random_game()      
+      screen, reward, action, terminal = self.env.new_random_game()
 
     for _ in range(self.history_length):
       self.history.add(screen)
@@ -151,9 +153,12 @@ class Agent(BaseModel):
           actions = []
 
   def predict(self, s_t, test_ep=None):
-    ep = test_ep or (self.ep_end +
-        max(0., (self.ep_start - self.ep_end)
-          * (self.ep_end_t - max(0., self.step - self.learn_start)) / self.ep_end_t))
+    if test_ep is None:
+      ep = (self.ep_end +
+          max(0., (self.ep_start - self.ep_end)
+            * (self.ep_end_t - max(0., self.step - self.learn_start)) / self.ep_end_t))
+    else:
+      ep = test_ep
 
     if random.random() < ep:
       action = random.randrange(self.env.action_size)
@@ -161,6 +166,10 @@ class Agent(BaseModel):
       action = self.q_action.eval({self.s_t: [s_t]})[0]
 
     return action
+
+  def compute_value(self, s_t):
+    v = self.value.eval({self.s_t: [s_t]})[0][0]
+    return v
 
   def observe(self, screen, reward, action, terminal):
     updated_dqn= False; updated_target= False
@@ -398,7 +407,6 @@ class Agent(BaseModel):
     if self.load_weights:
       self.load_model()
     else:
-      import pdb; pdb.set_trace()
       print "WARNING: NOT LOADING WEIGHTS."
     self.wp = {k:v.eval(self.sess) for k, v in self.w.iteritems()}
     self.update_target_q_network()
@@ -449,15 +457,18 @@ class Agent(BaseModel):
       )
       f.write(s)
 
-  def play(self, experiment, data_dir, n_step=10000, n_episode=2500, test_ep=None, render=False):
+  def play(self, experiment, data_dir, n_episode=50000, test_ep=None, render=False):
     if test_ep == None:
       test_ep = self.ep_end
+    arguments = {"test_ep": test_ep,
+                 "n_episodes": n_episode}
 
     test_history = History(self.config)
 
-    winners, losers = [], []
+    winners, winner_poss, losers, wrong_fits = [], [], [], []
+    first_vs, contact_vs = [], [] # values at first timestep, and upon contact
     steps_min, steps_taken = [], []
-    
+
     victors = np.zeros((len(self.env.shapes),len(self.env.shapes)))
     totals = np.zeros_like(victors)
     actions_after_grab = []
@@ -468,57 +479,86 @@ class Agent(BaseModel):
         test_history.add(screen)
 
       #for t in tqdm(range(n_step), ncols=70):
-      for t in range(n_step):
+      vs = []
+      contact_v = None
+      for t in range(self.config.max_tsteps):
+
         # 1. predict
-        action = self.predict(test_history.get(), test_ep)
+        s_t = test_history.get()
+        action = self.predict(s_t, test_ep)
+        if t == 0:
+            first_v = self.compute_value(s_t)
+        if experiment == "one_block":
+            if self.env.after_grab and contact_v is None:
+                contact_v = self.compute_value(s_t)
         # 2. act
         screen, reward, terminal, info = self.env.step(action)
         # 3. observe
         test_history.add(screen)
-        
+
         if self.display:
-          self.env.render()        
+          self.env.render()
 
         if terminal:
-          winners.append(info['winner'])          
+          first_vs.append(first_v)
+          winners.append(info['winner'])
+          if "winner_pos" in info.keys():
+            winner_poss.append(info['winner_pos'])
+
           if experiment == "preference":
             losers.append(info['loser'])
             victors[info['loser'],info['winner']] += 1
             totals[info['winner'],info['loser']] += 1
             totals[info['loser'],info['winner']] += 1
+
           if experiment == "one_block":
+            assert contact_v is not None
+            contact_vs.append(contact_v)
+
+            assert len(contact_vs) == len(winners)
+            assert len(first_vs) == len(winners)
+
+            assert info['n_steps'] <= self.config.max_tsteps
             steps_min.append(info['n_steps_min'])
             steps_taken.append(info['n_steps'])
             actions_after_grab.append(info['actions_after_grab'])
+            wrong_fits.append(info['wrong_fit'])
+
           break
 
-    #import pdb; pdb.set_trace()
     if experiment == "preference":
       pref_saver = Saver(path='{}/{}'.format(data_dir,'pref_results'))
       print("Winners: ")
       print(Counter(winners))
       print("Losers: ")
       print(Counter(losers))
-      
+
       D = {"totals":totals,
-           "victors":victors}
+           "victors":victors,
+           "side_bias": np.mean(np.row_stack(winner_poss)[:,0] == 0.7)}
+      import pdb; pdb.set_trace()
       pref_saver.save_dict(0, D, name="data")
+      pref_saver.save_dict(0, arguments, name="args")
+
     if experiment == "one_block":
       stats = np.column_stack([np.array(winners),
                               np.array(steps_min),
-                              np.array(steps_taken)])
+                              np.array(steps_taken),
+                              np.array(wrong_fits),
+                              np.array(first_vs),
+                              np.array(contact_vs)])
       actions_after_grab = np.array([np.array(a) for a in actions_after_grab])
-      diff = [c - b for (a, b, c) in stats]
-      
+      diff = [c - b for (a, b, c, d, e, f) in stats]
+
       one_block_saver = Saver(path='{}/{}'.format(data_dir,'one_block_results'))
       D1 = {"stats":stats}
       D2 = {"actions_after_grab": {str(k) : v for (k,v) in zip(range(len(actions_after_grab)),
                                                           actions_after_grab)}}
       one_block_saver.save_dict(0, D1, name="stats")
-      #one_block_saver.save_dict(0, D2, name="actions_after_grab")
       one_block_saver.save_recursive_dict(0, D2, name="actions_after_grab")
-      
+      one_block_saver.save_dict(0, arguments, name="args")
+
       #one_block_saver.save_dict(0, stats, name="stats")
       #one_block_saver.save_dict(0, actions_after_grab, name="actions_after_grab")
-      
+
       #gym.upload(gym_dir, writeup='https://github.com/devsisters/DQN-tensorflow', api_key='')

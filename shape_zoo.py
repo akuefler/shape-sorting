@@ -18,22 +18,20 @@ class Block(object):
         self.typ=typ
         self.surface=pg.Surface((size,size))
         self.surface.fill((0,0,255))
-                
+
     def render(self):
         raise NotImplementedError
 
 class Disk(Block): # Something we can create and manipulate
     def __init__(self, color, center, size, typ, angle): # initialze the properties of the object
         Block.__init__(self, color, center, size, typ)
-    
     def render(self,screen,angle):
         pg.draw.circle(screen,self.color,self.center,self.size)
         if self.typ == 'block':
             pg.draw.circle(screen,OUTLINE,self.center,self.size,1)
-            
     def rotate(self,angle):
         pass
-        
+
 class PolyBlock(Block): # Something we can create and manipulate
     def __init__(self,color,center,size, typ, angle): # initialze the properties of the object
         Block.__init__(self, color, center, size, typ)

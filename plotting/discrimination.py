@@ -100,7 +100,7 @@ ax_line = plt.axes(rect_line)
 
 #plt.tight_layout()
 
-plot_matrix_helper(C_grab, LABELS[c_argsort], ax_mat, normalize=True, plot_zeros=True, k=0,
+plot_matrix_helper(C_grab, LABELS[c_argsort], ax_mat, normalize=True, k=0,
                    thresh=0.6, cmap=plt.cm.Blues)
 
 artists = []
@@ -115,12 +115,12 @@ ax_line.set_xticklabels(['Conv1','Conv2','Conv3','Val.','Adv.'])
 
 ax_line.tick_params(axis="x",pad=15)
 
-ax_line.set_xlabel("Hidden Layer", fontsize=22, fontweight="bold")
+ax_line.set_xlabel("Hidden Layer", fontsize=28, fontweight="bold")
 if args.val:
     acc_name = "Validation"
 else:
     acc_name = "Training"
-ax_line.set_ylabel("{} Accuracy".format(acc_name), fontsize=22, fontweight="bold")
+ax_line.set_ylabel("{} Accuracy".format(acc_name), fontsize=28, fontweight="bold")
 
 ax_line.legend(artists, ("No Cursor", "Grabbing"), fontsize= args.legend_size, loc = 3)
 

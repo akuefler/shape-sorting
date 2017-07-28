@@ -1,11 +1,11 @@
 from shapesorting import *
-from sandbox.util import Saver
 
 import tensorflow as tf
 from main import FLAGS, get_agent
 import sys
 
-from sandbox.util import Saver
+from util import Saver
+DATADIR="/home/alex/stanford_dev/thesis/win/shapesorting/data/"
 
 import argparse
 

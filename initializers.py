@@ -101,6 +101,7 @@ def grid_initializer(ix, shapes, sizes, rot_size, permute=0):
         hole_orders = l[:permute]
     else:
         hole_orders = itertools.combinations(range(len(shapes)),4)
+
     for block_shape in shapes:
         for x_center in np.arange(0.1,1,0.1):
             for y_center in np.arange(0.1,1,0.1):
@@ -144,7 +145,7 @@ def grid_initializer(ix, shapes, sizes, rot_size, permute=0):
                                     })
                             for i, shape in enumerate(shapes)
                             ]
-                        
+
                         Ds.append(D)
     
     return Ds    

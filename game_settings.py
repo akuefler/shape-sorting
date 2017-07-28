@@ -19,7 +19,7 @@ DISCRETE_ACT_MAP1 = \
      ['grab','down'],
      ['grab','down', 'left'],
      ['grab','left'],
-     ['grab','up', 'left']     
+     ['grab','up', 'left']
      ]
 
 DISCRETE_ACT_MAP2 = \
@@ -32,7 +32,7 @@ DISCRETE_ACT_MAP2 = \
      ['down', 'left'],
      ['left'],
      ['up', 'left'],
-     ['grab'],    
+     ['grab'],
      ]
 
 DISCRETE_ACT_MAP3 = \
@@ -40,7 +40,7 @@ DISCRETE_ACT_MAP3 = \
      ['right'],
      ['down'],
      ['left'],
-     ['grab'],    
+     ['grab'],
      ]
 
 DISCRETE_ACT_MAP4 = \
@@ -48,7 +48,7 @@ DISCRETE_ACT_MAP4 = \
      ['right'],
      ['down'],
      ['left'],
-     ['grab'],    
+     ['grab'],
      ['rotate_cw'],
      ['rotate_ccw']
      ]

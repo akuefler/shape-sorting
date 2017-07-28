@@ -10,7 +10,9 @@ import matplotlib.pyplot as plt
 from config import DATADIR
 
 from util import Saver
+from plotting import *
 from config import *
+
 
 parser = argparse.ArgumentParser()
 
@@ -48,7 +50,7 @@ parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-19-22-3
 #parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-19-22-36-33-368248",
                                                                   #"17-01-19-22-37-16-244572",
                                                                   #"17-01-19-22-37-58-907670"])
-                           
+
 ## Holes, Enumerated
 #parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-20-21-12-51-477494",
                                                                   #"17-01-20-21-13-10-048480",
@@ -63,7 +65,7 @@ parser.add_argument("--encodings",nargs="+",type=str,default=["Z_l1_flat","Z_l2_
 parser.add_argument("--N",type=int,default=1000)
 parser.add_argument("--model",type=str,default="pca")
 parser.add_argument("--color_fn",type=str,default="shape")
-parser.add_argument("--show",type=int,default=1)
+parser.add_argument("--save",type=int,default=0)
 
 args = parser.parse_args()
 
@@ -117,16 +119,16 @@ for j, data_saver in enumerate(data_savers):
             #for i in range(NN)]
     #BLOCK_DELTAS = np.array([np.linalg.norm(holes['{:0{}}'.format(i,len(str(NN)))]['center'][b_ix[i]] - \
                                                   #blocks['{:0{}}'.format(i,len(str(NN)))]['center']) for i in range(NN)])
-    
+
     color_fns = {"center":color_from_2D(BLOCK_CENTER),
                  "shape":color_from_int(BLOCK_SHAPE)}
                  #"delta":color_from_1D(BLOCK_DELTAS)}
-    
+
     C = color_fns[args.color_fn]
-    
+
     models = {"pca":PCA(),"tsne":TSNE()}
     model = models[args.model]
-    
+
     np.random.seed(456)
     p = np.random.choice(range(NN),args.N,replace=False)
     print(len(p))
@@ -135,21 +137,31 @@ for j, data_saver in enumerate(data_savers):
             ax.set_xlabel(xlabels[i],fontweight="bold")
         if i == 0:
             ax.set_ylabel(ylabels[j],fontweight="bold")
-        
+
         G = model.fit_transform(data[layer][p])
         handles = ax.scatter(G[:,0],G[:,1],c=C[p],s=85)
-        
+
         ax.set_xticks([])
         ax.set_yticks([])
         ax.set_xticklabels([])
         ax.set_yticklabels([])
-    
-#plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
 
-if args.show:
-    plt.show()
-else:
-    plt.tight_layout()        
+# add a legend
+patches = []
+for i, name in enumerate(LABELS):
+    color = color_from_int(i + 1)
+    patches.append(mpatches.Patch(color= color_from_int(i + 1), label= name))
+patches = np.array(patches)[SHAPE_ORDER]
+
+#plt.legend(loc='upper center', bbox_to_anchor=(-5, -0.05), handles=patches, ncol=len(patches))
+plt.sca(axs[-1,2])
+plt.legend(loc='lower center', bbox_to_anchor=(0.5, -0.4), handles=list(patches), ncol=len(patches))
+
+
+if args.save:
+    plt.tight_layout()
     print("{}/pca.pdf".format(FIGDIR))
-    plt.savefig("{}/pca.pdf".format(FIGDIR),bbox_inches='tight',format='pdf',dpi=300)
+    plt.savefig("{}/pca.pdf".format(FIGDIR),bbox_inches='tight',format='pdf',dpi=800)
+else:
+    plt.show()
 

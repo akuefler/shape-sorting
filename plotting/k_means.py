@@ -72,6 +72,7 @@ used these for the discriminator experiment.
 parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-20-23-17-53-444875",
                                      "17-01-20-23-26-23-488455"])
                                      ##"17-01-20-23-33-47-043926"])
+
 ## UNTRAINED network
 #parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-29-14-21-59-644400",
 #                                                                  "17-01-29-14-30-54-397244"])
@@ -80,27 +81,28 @@ parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-20-23-1
 used these data for the paper.
 """
 ## Fixed Position
-#parser.add_argument("--data_times", nargs="+", type=str, default=["17-01-19-22-34-07-174659",
-#                                                                  "17-01-19-22-34-56-056347",
-#                                                                  ])
+#parser.add_argument("--data_times", nargs="+", type=str,
+#        default=["17-01-19-22-34-07-174659",
+#                 "17-01-19-22-34-56-056347"])
+#                                                                  #"17-01-19-22-35-45-287050"])
 
-                                                                  #"17-01-19-22-35-45-287050"])
 
+#parser.add_argument("--encodings",nargs="+",type=str,default=["Z_l1_flat","Z_l2_flat","Z_l3_flat","Z_value_hid","Z_adv_hid"])
+parser.add_argument("--encodings",nargs="+",type=str,default=["Z_l3_flat"])
 
-parser.add_argument("--encodings",nargs="+",type=str,default=["Z_l1_flat","Z_l2_flat","Z_l3_flat","Z_value_hid","Z_adv_hid"])
-
-parser.add_argument("--N",type=int,default=1000)
+parser.add_argument("--N",type=int,default=2500)
 parser.add_argument("--color_fn",type=str,default="shape")
-parser.add_argument("--save",type=int,default=1)
+parser.add_argument("--save",type=int,default=0)
 parser.add_argument("--seed",type=int,default=456)
 parser.add_argument("--normalize",type=int,default=0)
 parser.add_argument("--reduced_dim",type=int,default=300)
-parser.add_argument("--viz_w_lda",type=int,default=0)
+parser.add_argument("--color_correct",type=int,default=0)
+parser.add_argument("--viz_w_lda",type=int,default=1)
+parser.add_argument("--transpose",type=int,default=1)
 
 args = parser.parse_args()
 
 assert args.color_fn in ["shape","center","delta"]
-
 
 data_savers = [Saver(time=data_time,path='{}/{}'.format(DATADIR,'scene_and_enco_data'))
                for data_time in args.data_times]
@@ -162,7 +164,23 @@ def color_from_int(X):
                   [0.5,0.2,0.9]])
     return T[X]
 
-f, axs = plt.subplots(len(data_savers),len(args.encodings), figsize=(2.5 * 10,10))
+if args.transpose:
+    n_cols = len(data_savers)
+    n_rows = len(args.encodings)
+else:
+    n_rows = len(data_savers)
+    n_cols = len(args.encodings)
+f, axs = plt.subplots(n_rows,n_cols, figsize=(n_cols * 10, n_rows * 10))
+one_data = len(data_savers) == 1
+one_enco = len(args.encodings) == 1
+if one_data and one_enco:
+    axs = np.array([[axs]])
+elif one_data or one_enco:
+    if args.transpose:
+        axs = axs[None,...]
+    else:
+        axs = axs[...,None]
+
 xlabels = ["Conv1", "Conv2", "Conv3", "Val.", "Adv."]
 ylabels = ["No Cursor", "Grabbing"]
 
@@ -172,7 +190,10 @@ for j, data_saver in enumerate(data_savers):
     print("######")
     print(data_saver.load_args())
 
+    print("loading data ...")
     data = data_saver.load_dictionary(0,"data")
+    print("... finished loading data")
+
     blocks = data_saver.load_recursive_dictionary("blocks")
     holes = data_saver.load_recursive_dictionary("holes")
     NN = data["X"].shape[0]
@@ -187,14 +208,24 @@ for j, data_saver in enumerate(data_savers):
     np.random.seed(args.seed)
     p = np.random.choice(range(NN),args.N,replace=False)
 
-    cohere_1 = []
-    acc_1 = []
-    for i, (layer, ax) in enumerate(zip(args.encodings,axs[j])):
+    for i, layer in enumerate(args.encodings):
+        if args.transpose:
+            ax = axs[i,j]
+        else:
+            ax = axs[j,i]
+
         # label axes
-        if j == len(data_savers) - 1:
-            ax.set_xlabel(xlabels[i],fontweight="bold")
-        if i == 0:
-            ax.set_ylabel(ylabels[j],fontweight="bold")
+        if args.transpose:
+            #if j == len(data_savers) - 1 and n_cols > 1:
+            #    ax.set_xlabel(xlabels[i],fontweight="bold")
+            #if j == 0 and n_cols > 1:
+            ax.set_xlabel(ylabels[j], fontsize= 34, fontweight="bold")
+
+        else:
+            if i == len(data_savers) - 1 and n_cols > 1:
+                ax.set_xlabel(xlabels[i],fontweight="bold")
+            if j == 0 and n_rows > 1:
+                ax.set_ylabel(ylabels[j],fontweight="bold")
 
         # sample activations and normalize
         X = data[layer][p]
@@ -203,40 +234,51 @@ for j, data_saver in enumerate(data_savers):
             X /= (X.std(axis=0) + 1e-10)
 
         # project data
+
+        print("fit transform with PCA ...")
         if args.reduced_dim > 0:
             G = pca.fit_transform(X)[:,:args.reduced_dim]
         else:
             print("Warning: Skipping PCA")
             G = X
-        #G = (G - G.mean(axis=0))/(G.std(axis=0) + 1e-8)
 
         # cluster projected data
-        kmeans = KMeans(n_clusters = 5)
-        kmeans.fit(G)
-
         l = BLOCK_SHAPE[p]
-        y, acc_vector = cluster_to_label(kmeans.predict(G),l)
-        acc = np.mean(acc_vector)
 
-        print("Dataset: {}, Layer: {}, Acc: {}".format(j,i,acc))
-        cohere_vector = compute_coherence(kmeans.cluster_centers_,G,l)
-        cohere_1.append(cohere_vector)
-        acc_1.append(acc_vector)
-        print("Coherence: {}; Inertia: {}".format(
-            cohere_vector,kmeans.inertia_)
-            )
+        print("computing labels ...")
+        if args.color_correct:
+            kmeans = KMeans(n_clusters = 5)
+            kmeans.fit(G)
+            y, acc_vector = cluster_to_label(kmeans.predict(G),l)
+            acc = np.mean(acc_vector)
+
+            print("Dataset: {}, Layer: {}, Acc: {}".format(j,i,acc))
+            cohere_vector = compute_coherence(kmeans.cluster_centers_,G,l)
+            cohere_1.append(cohere_vector)
+            acc_1.append(acc_vector)
+            print("Coherence: {}; Inertia: {}".format(
+                cohere_vector,kmeans.inertia_)
+                )
+            correct = (l == y).astype('int32')
+        else:
+            correct = (l == l).astype('int32')
 
         # use LDA just for the visulization step.
         if args.viz_w_lda:
             G = lda.fit_transform(X, l)
-        correct = (l == y).astype('int32')
+
         G_correct = G[correct == 1]
         c_correct = color_from_int(l[correct == 1] + 1)
         G_wrong = G[correct == 0]
         c_wrong = color_from_int(l[correct == 0] + 1)
 
-        handles = ax.scatter(G_wrong[:,0], G_wrong[:,1], facecolors='none', edgecolor=c_wrong, s=85)
-        handles = ax.scatter(G_correct[:,0], G_correct[:,1], facecolors=c_correct, s=85)
+        print("plotting ... ")
+        if args.color_correct:
+            handles = ax.scatter(G_wrong[:,0], G_wrong[:,1], facecolors='none', edgecolor=c_wrong, s=85)
+            handles = ax.scatter(G_correct[:,0], G_correct[:,1], facecolors=c_correct, s=85)
+        else:
+            handles = ax.scatter(G_correct[:,0], G_correct[:,1],
+                    facecolors=c_correct, s=85)
 
         #c = color_from_int(np.array(l == y).astype('int32') * (y+1))
         #cl = color_from_int((l+1))
@@ -251,8 +293,10 @@ for j, data_saver in enumerate(data_savers):
         ax.set_yticks([])
         ax.set_xticklabels([])
         ax.set_yticklabels([])
-    cohere_0.append(cohere_1)
-    acc_0.append(acc_1)
+
+    if args.color_correct:
+        cohere_0.append(cohere_1)
+        acc_0.append(acc_1)
 
 # grab x layer x shape
 #SPREAD_MAT = np.array(cohere_0)
@@ -269,11 +313,20 @@ for i, name in enumerate(LABELS):
 patches = np.array(patches)[SHAPE_ORDER]
 
 #plt.legend(loc='upper center', bbox_to_anchor=(-5, -0.05), handles=patches, ncol=len(patches))
-plt.sca(axs[-1,2])
-plt.legend(loc='lower center', bbox_to_anchor=(0.5, -0.4), handles=list(patches), ncol=len(patches))
+#axs[0,0].set_title("Conv 3 Projected Encodings")
+if True:
+    plt.sca(axs[-1,len(args.encodings)/2])
+    #plt.legend(loc='lower center', bbox_to_anchor=(0.5, -0.4), handles=list(patches), ncol=len(patches))
+    plt.legend(loc='lower center', bbox_to_anchor=(1.025, -0.2),
+            handles=list(patches), ncol=len(patches))
+else:
+    plt.sca(axs[-1,0])
+    plt.legend(loc='center left', bbox_to_anchor=(1, 1.05),
+            handles=list(patches))
 
+plt.subplots_adjust(wspace=0.05, hspace=0.05)
 if args.save:
-    plt.savefig("{}/kmeans.pdf".format(FIGDIR),bbox_inches='tight',format='pdf',dpi=300)
+    plt.savefig("{}/kmeans.pdf".format(FIGDIR),bbox_inches='tight',format='pdf',dpi=800)
 else:
     plt.show()
 

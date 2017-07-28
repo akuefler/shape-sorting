@@ -24,7 +24,7 @@ flags.DEFINE_boolean('double_q', False, 'Whether to use double q-learning')
 #flags.DEFINE_string('env_name', 'CartPole-v0', 'The name of gym environment to use')
 flags.DEFINE_string('env_name', 'shapesort', 'The name of gym environment to use')
 flags.DEFINE_string('env_type', 'shapesort', 'environment type?')
-game_settings = 2
+game_settings = 3 # 2 is one_block, 3 is preference
 flags.DEFINE_string('game_settings', game_settings, 'game settings')
 flags.DEFINE_integer('action_repeat', 1, 'The number of action to be repeated')
 
@@ -86,8 +86,8 @@ def main(_):
     if settings["experiment"] in ["training"]:
       agent.train()
     elif settings["experiment"] in ["preference","one_block"]:
-      agent.play(settings["experiment"], data_dir= DATADIR)
-      
+      agent.play(settings["experiment"], test_ep= 0.1, data_dir= DATADIR)
+
 def get_agent(_, load_weights):
   with tf.Session() as sess:
     config = get_config(FLAGS) or FLAGS
@@ -106,7 +106,7 @@ def get_agent(_, load_weights):
 
     agent = Agent(config, env, sess, load_weights= load_weights)
     return agent
-  
+
 
 if __name__ == '__main__':
   #tf.app.run()
