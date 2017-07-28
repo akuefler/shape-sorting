@@ -12,6 +12,12 @@
 
 **util.py** Wrapper allowing "registration" of the environment. Saver object that uses h5py.
 
+### Branches
+
+**master** includes only those files relevant to instantiating and running trials on the shapesorting task environment.
+
+**cogsci** includes all code resources used to run experiments described in our submission to Cog Sci 2017.
+
 ### Installing
 
 ```
