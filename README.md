@@ -20,6 +20,10 @@ git clone https://github.com/akuefler/shape-sorting.git
 
 ### Requirements
 Gym
+
 shapely >= 1.5.13
+
 pygame >= 1.9.2b8
+
 h5py >= 2.6.0
+
