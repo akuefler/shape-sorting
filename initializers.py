@@ -48,6 +48,11 @@ def standard_initializer(n_blocks, shapes, sizes, rot_size, random_holes):
     return D
 
 def preference_initializer(n_blocks, shapes, sizes, rot_size, random_holes):
+    """
+    creates initial conditions for two blocks with no distractor holes,
+    equidistant from appropriate holes. as described in the preference
+    experiments.
+    """
     block_selections = np.zeros(len(shapes)).astype('int32')
     z_ix= np.random.choice(range(len(shapes)),2,replace=False)
     block_selections[z_ix] = 1
@@ -94,6 +99,11 @@ def preference_initializer(n_blocks, shapes, sizes, rot_size, random_holes):
     return D
 
 def grid_initializer(ix, shapes, sizes, rot_size, permute=0):
+    """
+    WARNING: The signature here is a little different. Creates a list of
+    initial conditions, tiling the screen with a single block, tiling all
+    orientations. Used to generate the datasets for supervised learning.
+    """
     Ds = []
     if permute > 0:
         l = list(itertools.permutations(range(len(shapes)),4))
@@ -147,5 +157,5 @@ def grid_initializer(ix, shapes, sizes, rot_size, permute=0):
                             ]
 
                         Ds.append(D)
-    
-    return Ds    
+
+    return Ds

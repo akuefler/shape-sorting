@@ -22,8 +22,8 @@ class Block(object):
     def render(self):
         raise NotImplementedError
 
-class Disk(Block): # Something we can create and manipulate
-    def __init__(self, color, center, size, typ, angle): # initialze the properties of the object
+class Disk(Block):
+    def __init__(self, color, center, size, typ, angle):
         Block.__init__(self, color, center, size, typ)
     def render(self,screen,angle):
         pg.draw.circle(screen,self.color,self.center,self.size)
@@ -32,8 +32,8 @@ class Disk(Block): # Something we can create and manipulate
     def rotate(self,angle):
         pass
 
-class PolyBlock(Block): # Something we can create and manipulate
-    def __init__(self,color,center,size, typ, angle): # initialze the properties of the object
+class PolyBlock(Block):
+    def __init__(self,color,center,size, typ, angle):
         Block.__init__(self, color, center, size, typ)
         self.surface=pg.Surface((size+PAD,size+PAD))
         self.surface.fill(WHITE)

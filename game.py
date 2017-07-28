@@ -1,24 +1,18 @@
 import pygame as pg
 from pygame import Surface
-import matplotlib.pyplot as plt
 import numpy as np
 from scipy.misc import imresize
-from scipy.stats import entropy
-import matplotlib as mpl
 
 import h5py
 
 from config import *
 
-import sys
 import gym
 from gym.spaces import Discrete, Box
 
 from game_settings import DISCRETE_ACT_MAP4 as DISCRETE_ACT_MAP
 from game_settings import REWARD_DICT2 as REWARD_DICT
 from game_settings import INITIALIZER_MAP
-
-from math import pi
 
 import shapely.geometry
 from shape_zoo import *
